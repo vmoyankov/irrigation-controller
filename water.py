@@ -1,16 +1,77 @@
 import time
 import network
 from machine import Pin, PWM, Timer
+import micropython
+import array
 
 import config
 
-BUS_PINS = (4, 3, 6, 1)
-PUMP_PIN = 0
-METER_PIN = 5
+BUS_PINS = (21, 20, 10, 7)
+PUMP_PIN = 5
+METER_PIN = 6
 PWM_FREQ = 100
 PUMP_DUTY = 20000
+FEEDBACK_PIN = 0
 
 LED_PIN = 8
+
+PULSES_PER_L = 3250
+
+class Meter:
+
+    def __init__(self, in_pin, feedback_pin, log_size=300):
+        self.counter = 0
+        self.log_size = log_size
+        self.log = array.array('L', (0 for x in range(log_size)))
+        self.pin = Pin(in_pin, Pin.IN)
+        self.feedback = Pin(feedback_pin, Pin.OUT, value=0)
+        self.pin.irq(handler=self.cb, trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING)
+        self.last_tick = time.ticks_us()
+        self.state = True
+        self.fast_irq = 0
+
+
+    def cb(self,pin):
+        now = time.ticks_us()
+        dt = now - self.last_tick
+        self.last_tick = now
+        if dt < 1000: 
+            self.fast_irq += 1
+            return
+        self.feedback.value(self.state)
+        if self.counter < self.log_size:
+            self.log[self.counter] = dt
+        self.counter += 1
+        self.state = not self.state
+
+    def __repr__(self):
+        return self.counter
+
+
+class Blink:
+
+    def __init__(self, pin, timer=0, f=None):
+        self.led = Pin(pin, Pin.OUT, value=0)
+        self.state = False
+        self.timer = Timer(timer)
+        self.freq(f)
+
+    def cb(self, timer):
+        self.state = not self.state
+        self.led.value(self.state)
+
+    def freq(self, f):
+        if f is not None:
+            self.timer.deinit()
+            self.timer.init(period = 500 // f, 
+            mode=Timer.PERIODIC,
+            callback=self.cb
+            )
+
+    def stop(self):
+        self.timer.deinit()
+        self.led.off()
+
 
 valves = (
     (None, None, None, None),  # 0, All valves are closed
@@ -28,45 +89,19 @@ valves = (
     (None, None, 0   , 1   ),  # 12
 )
 
-bus = []
-pump: PWM = None
-water_counter = 0
-meter: Pin = None
-led: Pin = None
 
+bus = []
+#pump = Pin(PUMP_PIN, Pin.OUT, value=0)
+pump = PWM(Pin(PUMP_PIN), freq=PWM_FREQ, duty_u16=0)
+led = Blink(LED_PIN)
+meter = Meter(METER_PIN, FEEDBACK_PIN)
 
 def init():
-    global bus, pump, meter, water_counter, led
+    global bus
 
+    micropython.alloc_emergency_exception_buf(100)
     for pin_id in BUS_PINS:
         bus.append(Pin(pin_id, Pin.IN))
-
-    # pump = Pin(PUMP_PIN, Pin.OUT)
-    pump = PWM(Pin(PUMP_PIN), freq=PWM_FREQ, duty_u16=0)
-
-    meter = Pin(METER_PIN, Pin.IN)
-    meter.irq(handler=meter_callback, trigger=Pin.IRQ_RISING)
-
-    led = Pin(LED_PIN, Pin.OUT, value=1)
-
-
-def meter_callback(pin):
-    global water_counter
-
-    if pin == meter:
-        water_counter += 1
-
-
-def led_blink(freq):
-    global led
-
-    t = Timer(0)
-    t.init(period = 500 // freq, 
-           mode=Timer.PERIODIC,
-           callback=lambda t:
-                led.value(1 - led.value())
-           )
-
 
 
 def open_valve(valve_id):
@@ -85,31 +120,26 @@ def open_valve(valve_id):
 
 
 def pump_start():
-    # pump.on()
+    #pump.on()
     pump.duty_u16(PUMP_DUTY)
 
 
 def pump_stop():
-    # pump.off()
+    #pump.off()
     pump.duty_u16(0)
 
 
-def test_valves():
-    for v in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
-        open_valve(v)
-        time.sleep(1)
-    open_valve(0)
-
-
 def do_connect(timeout=30_000):
-    led_blink(5)
+    import ntptime
+
+    led.freq(2)
     wlan = network.WLAN()
     wlan.active(True)
     if not wlan.isconnected():
         print("connecting to network...")
         wlan.connect(config.SSID, config.WLAN_KEY)
         while not wlan.isconnected():
-            led_blink(5)
+            led.freq(5)
             time.sleep_ms(100)
             timeout -= 100
             if timeout <= 0:
@@ -117,25 +147,33 @@ def do_connect(timeout=30_000):
                 break
     print("network config:", wlan.ifconfig())
     if wlan.isconnected():
-        led_blink(1)
+        led.freq(1)
+        try:
+            ntptime.settime()
+        except OSError:
+            pass
     else:
-        led_blink(2)
+        led.freq(2)
 
 
-def test_meter(amount=1000, timeout=30_000):
-    pump_start()
-    time.sleep(1)
-    start_cnt = water_counter
+def test_meter(ml, valve, timeout=30_000):
+    pulses = int(ml * PULSES_PER_L / 1000)
+    open_valve(valve)
+    time.sleep(0.1)
+    start_cnt = meter.counter
     start_time = time.ticks_ms()
-    print("Initial counter:", water_counter)
-    open_valve(1)
-    while (water_counter < start_cnt + amount and 
+    pump_start()
+    print("Initial counter:", start_cnt)
+    while (meter.counter < start_cnt + pulses and 
            time.ticks_ms() < start_time + timeout) :
         time.sleep_ms(10)
+    end_cnt = meter.counter
+    end_time = time.ticks_ms()
     open_valve(0)
     pump_stop()
-    time.sleep_ms(100)
-    print("Stop counter:", water_counter)
+    duration = end_time - start_time 
+    print("Stop counter: ", end_cnt, " duration: ", duration)
+    print("Fast IRQs:", meter.fast_irq)
 
 
 init()
