@@ -9,8 +9,9 @@ import config
 BUS_PINS = (21, 20, 10, 7)
 PUMP_PIN = 5
 METER_PIN = 6
-PWM_FREQ = 100
+PWM_FREQ = 2000
 PUMP_DUTY = 20000
+RAMP_UP_TIME = 2.0   # seconds befor open the valve
 MONITOR_PIN = 0
 
 LED_PIN = 8
@@ -158,11 +159,11 @@ def do_connect(timeout=30_000):
 
 def test_meter(ml, valve, timeout=30_000):
     pulses = int(ml * PULSES_PER_L / 1000)
+    pump_start()
+    time.sleep(RAMP_UP_TIME)
     open_valve(valve)
-    time.sleep(0.1)
     start_cnt = meter.counter
     start_time = time.ticks_ms()
-    pump_start()
     print("Initial counter:", start_cnt)
     while (meter.counter < start_cnt + pulses and 
            time.ticks_ms() < start_time + timeout) :
@@ -170,6 +171,7 @@ def test_meter(ml, valve, timeout=30_000):
     end_cnt = meter.counter
     end_time = time.ticks_ms()
     open_valve(0)
+    time.sleep(0.3)
     pump_stop()
     duration = end_time - start_time 
     print("Stop counter: ", end_cnt, " duration: ", duration)
