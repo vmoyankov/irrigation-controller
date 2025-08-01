@@ -11,7 +11,7 @@ PUMP_PIN = 5
 METER_PIN = 6
 PWM_FREQ = 100
 PUMP_DUTY = 20000
-FEEDBACK_PIN = 0
+MONITOR_PIN = 0
 
 LED_PIN = 8
 
@@ -19,15 +19,15 @@ PULSES_PER_L = 3250
 
 class Meter:
 
-    def __init__(self, in_pin, feedback_pin, log_size=300):
+    def __init__(self, in_pin, monitor_pin, log_size=300):
         self.counter = 0
         self.log_size = log_size
         self.log = array.array('L', (0 for x in range(log_size)))
         self.pin = Pin(in_pin, Pin.IN)
-        self.feedback = Pin(feedback_pin, Pin.OUT, value=0)
+        self.monitor = Pin(monitor_pin, Pin.OUT, value=0)
         self.pin.irq(handler=self.cb, trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING)
         self.last_tick = time.ticks_us()
-        self.state = True
+        self.monitor_state = True
         self.fast_irq = 0
 
 
@@ -38,11 +38,11 @@ class Meter:
         if dt < 1000: 
             self.fast_irq += 1
             return
-        self.feedback.value(self.state)
+        self.monitor.value(self.monitor_state)
         if self.counter < self.log_size:
             self.log[self.counter] = dt
         self.counter += 1
-        self.state = not self.state
+        self.monitor_state = not self.monitor_state
 
     def __repr__(self):
         return self.counter
@@ -94,7 +94,7 @@ bus = []
 #pump = Pin(PUMP_PIN, Pin.OUT, value=0)
 pump = PWM(Pin(PUMP_PIN), freq=PWM_FREQ, duty_u16=0)
 led = Blink(LED_PIN)
-meter = Meter(METER_PIN, FEEDBACK_PIN)
+meter = Meter(METER_PIN, MONITOR_PIN)
 
 def init():
     global bus
