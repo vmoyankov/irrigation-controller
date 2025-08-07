@@ -1,3 +1,27 @@
+# config.py
+# Central configuration file for the async irrigation controller.
 
-SSID = "ssid"
-WLAN_KEY = "XXXX"
+# --- WiFi Configuration ---
+# IMPORTANT: Replace with your network details
+SSID = "Your_SSID"
+WLAN_KEY = "Your_Password"
+WIFI_TIMEOUT = 30000     # max connection time in ms
+
+# --- Hardware Pin Assignments ---
+# Define the GPIO pin numbers connected to your hardware.
+LED_PIN = 8
+PUMP_PIN = 5
+METER_PIN = 6
+MONITOR_PIN = 0  # For monitoring meter IRQ with a logic analyzer/scope
+VALVE_BUS_PINS = (21, 20, 10, 7) # The 4 pins controlling the valve matrix
+
+# --- Operational Parameters ---
+# Fine-tune the system's behavior.
+PUMP_PWM_FREQ = 2000
+PUMP_DUTY_CYCLE = 20000     # Pump power (0-65535 for duty_u16)
+PUMP_RAMP_UP_TIME_S = 2.0   # Seconds to wait for pump to build pressure
+PULSES_PER_LITER = 3250     # Pulses from the flow meter that equal 1 liter
+MIN_FLOW_S_PER_L = 240      # Max seconds per liter before a timeout occurs
+
+# --- Web Server Configuration ---
+WEB_SERVER_PORT = 80
