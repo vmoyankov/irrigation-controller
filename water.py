@@ -4,7 +4,9 @@ from machine import Pin, PWM, Timer
 import micropython
 import array
 
+import tz
 import config
+from program import program
 
 BUS_PINS = (21, 20, 10, 7)
 PUMP_PIN = 5
@@ -106,18 +108,18 @@ def init():
 
 
 def open_valve(valve_id):
-    print("open valve ", valve_id)
+    print("        open valve ", valve_id)
     for i, pin in enumerate(bus):
         lvl = valves[valve_id][i]
         if lvl == 0:
             pin.init(mode=Pin.OUT, value=0)
-            print("pin ", pin, " 0")
+            # print("pin ", pin, " 0")
         elif lvl == 1:
             pin.init(mode=Pin.OUT, value=1)
-            print("pin ", pin, " 1")
+            # print("pin ", pin, " 1")
         else:
             pin.init(mode=Pin.IN)
-            print("pin ", pin, " -")
+            # print("pin ", pin, " -")
 
 
 def pump_start():
@@ -176,6 +178,51 @@ def test_meter(ml, valve, timeout=30_000):
     duration = end_time - start_time 
     print("Stop counter: ", end_cnt, " duration: ", duration)
     print("Fast IRQs:", meter.fast_irq)
+
+
+def valve_ml(valve, ml, min_flow = 240):
+    """
+    open valve for ml milliliters.
+    Pump must be running
+    min_flow is in sec per liter, used to calculate
+        max duration
+    """
+
+    timeout = ml * min_flow  # in msec
+    pulses = int(ml * PULSES_PER_L / 1000)
+    print(f"  Open Valve {valve} for {ml} ml. Timeout {timeout/1000}[s]")
+    start_cnt = meter.counter
+    start_time = time.ticks_ms()
+    open_valve(valve)
+    while (meter.counter < start_cnt + pulses and 
+           time.ticks_ms() < start_time + timeout) :
+        time.sleep_ms(10)
+    end_cnt = meter.counter
+    end_time = time.ticks_ms()
+    duration = end_time - start_time 
+    print("      Close. Duration:", duration/1000,
+          "Pulses:", (end_cnt - start_cnt))
+
+
+def run_cycle():
+    print("Run cycle")
+    open_valve(0)
+    pump_start()
+    time.sleep(RAMP_UP_TIME)
+    start_cnt = meter.counter
+    start_time = time.ticks_ms()
+    for v, ml in sorted(program.items()):
+        valve_ml(v, ml)
+    end_cnt = meter.counter
+    end_time = time.ticks_ms()
+    duration = end_time - start_time 
+    open_valve(0)
+    pump_stop()
+    print("cycle finished" ,
+          "time:", duration / 1000,
+          "water:", (end_cnt - start_cnt) / PULSES_PER_L,
+          )
+
 
 
 init()
