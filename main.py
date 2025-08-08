@@ -8,6 +8,7 @@ import micropython
 # --- Third-party libraries ---
 # https://github.com/wybiral/micropython-aioweb
 import web
+from tz import localtime
 
 # --- Project modules ---
 import config  # Our new configuration file
@@ -24,16 +25,21 @@ STATE_NAMES = {
 }
 current_state = STATE_BOOTING
 error_message = ""
+last_run = "Never"
+status_message = ""
 
 # --- Web App and Logger ---
 app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
+
+def fmt_time(lt):
+    return f"{lt[0]:04d}-{lt[1]:02d}-{lt[2]:02d} {lt[3]:02d}:{lt[4]:02d}:{lt[5]:02d}"
+
 
 def log(level, msg):
     """Simple logging function with timestamps."""
     try:
         # Format time if NTP has been set
-        lt=time.localtime()
-        ts = f"{lt[3]:02d}:{lt[4]:02d}:{lt[5]:02d}"
+        ts = fmt_time(localtime())
     except TypeError:
         # Fallback to seconds since boot if time not set
         ts = f"{time.ticks_ms()//1000}s"
@@ -71,16 +77,18 @@ class AsyncBlink:
     def __init__(self, pin):
         self.led = Pin(pin, Pin.OUT, value=0)
         self.task = None
+        self.val = True
 
     async def _run(self, period_ms):
         while True:
-            self.led.toggle()
+            self.led.value(self.val)
+            self.val = not self.val
             await asyncio.sleep_ms(period_ms)
 
     def freq(self, f):
         self.stop()
         if f is not None and f > 0:
-            period_ms = 1000 // (f * 2)
+            period_ms = int(1000 // (f * 2))
             self.task = asyncio.create_task(self._run(period_ms))
 
     def stop(self):
@@ -156,16 +164,19 @@ async def do_connect():
     try:
         import ntptime
         ntptime.settime()
-        log("INFO", f"Time set via NTP: {time.localtime()}")
+        log("INFO", f"Time set via NTP: {localtime()}")
     except Exception as e:
         log("WARN", f"Could not set time via NTP: {e}")
     return True
 
 async def valve_ml(valve, ml):
+    global error_message, status_message
+
     """Dispenses a specific amount of water from a valve."""
     timeout_ms = ml * config.MIN_FLOW_S_PER_L
     pulses_needed = int(ml * config.PULSES_PER_LITER / 1000)
-    log("INFO", f"  Dispensing {ml}ml from valve {valve} ({pulses_needed} pulses)")
+    status_message = f"Dispensing {ml}ml from valve {valve} ({pulses_needed} pulses)"
+    log("INFO", status_message)
     
     start_cnt = meter.counter
     start_time = time.ticks_ms()
@@ -183,7 +194,7 @@ async def valve_ml(valve, ml):
 
 async def run_cycle():
     """Runs a full irrigation cycle based on the 'program' dictionary."""
-    global current_state, error_message
+    global current_state, error_message, last_run, status_message
     if current_state != STATE_IDLE:
         log("WARN", "Cannot start cycle, system is not idle.")
         return
@@ -191,13 +202,24 @@ async def run_cycle():
     current_state = STATE_RUNNING_CYCLE
     log("INFO", "--- Starting Irrigation Cycle ---")
     
+    open_valve(0)
     pump_start()
     await asyncio.sleep(config.PUMP_RAMP_UP_TIME_S)
 
+    start_cnt = meter.counter
+    start_time = time.ticks_ms()
     try:
         for v, ml in sorted(program.items()):
             await valve_ml(v, ml)
-        log("INFO", "Cycle completed successfully.")
+
+        end_cnt = meter.counter
+        end_time = time.ticks_ms()
+        duration = time.ticks_diff(end_time, start_time)
+        total_water = (end_cnt - start_cnt) / config.PULSES_PER_LITER
+        lt = fmt_time(localtime())
+        last_run = f"Cycle completed successfully at [{lt}]. Total Time: {duration / 1000:.2f}s Total Water: {total_water:.3f}L"
+        status_message = ""
+        log("INFO", last_run)
     except Exception as e:
         error_message = f"Cycle failed: {e}"
         log("ERROR", error_message)
@@ -215,21 +237,25 @@ async def run_cycle():
 async def index(r,w):
     """Main status page for the web interface."""
     status_name = STATE_NAMES.get(current_state, "UNKNOWN")
+    liters = meter.counter / config.PULSES_PER_LITER
     html = f"""
     <!DOCTYPE html><html><head><title>Irrigation Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>body{{font-family:sans-serif;}}</style></head><body>
     <h1>Irrigation Controller</h1>
     <p><strong>State:</strong> {status_name}</p>
-    <p><strong>Flow Meter Pulses:</strong> {meter.counter}</p>
+    <p>{status_message}</p>
+    <p><strong>Last Irrigation:</strong> {last_run}</p>
+    <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.counter} pulses)</p>
     <p><strong>Last Error:</strong> {error_message or "None"}</p>
+    <p><string><a href="/program">Program</a></p>
     <form action="/run" method="post">
         <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
     </form>
     </body></html>
     """
 
-    w.write(b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n")
+    w.write(b"HTTP/1.0 200 OK\r\nRefresh: 5\r\nContent-Type: text/html\r\n\r\n")
     w.write(html.encode("utf8"))
     await w.drain()
 
@@ -242,8 +268,16 @@ async def run_cycle_request(r,w):
         msg, code = "Cycle started", 200
     else:
         msg, code = "System is not idle, cannot start cycle.", 409
-    w.write(f"HTTP/1.0 {code} OK\r\nContent-Type: text/plain\r\n\r\n".encode("utf8"))
-    w.write(msg.encode("utf8"))
+    w.write(f"HTTP/1.0 {code} OK\r\nRefresh: 3;url=/\r\nContent-Type: text/html\r\n\r\n".encode("utf8"))
+    html = f"""<html><head></head><body><h1>{msg}</h1></body></html>"""
+    w.write(html.encode("utf8"))
+    await w.drain()
+
+@app.route('/program')
+async def print_program(r,w):
+    html = str(program)
+    w.write(b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n")
+    w.write(html.encode("utf8"))
     await w.drain()
 
 # --- Main Application Logic ---
@@ -280,7 +314,7 @@ async def main():
         
         elif current_state == STATE_IDLE:
             led.freq(0.5) # Slow blink for idle
-            await asyncio.sleep(5)
+            await asyncio.sleep(60)
             
         elif current_state == STATE_RUNNING_CYCLE:
             led.freq(5) # Fast blink for running
@@ -290,6 +324,11 @@ async def main():
             led.freq(10) # Very fast "panic" blink
             log("ERROR", f"System in ERROR state: {error_message}")
             await asyncio.sleep(30) # Wait before retrying or halting
+        
+        else:
+            log("WARNING", "Unknown state")
+            await asyncio.sleep(1)
+
 
 # --- Program Entry Point ---
 if __name__ == "__main__":
