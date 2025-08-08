@@ -4,6 +4,7 @@ import time
 import network
 from machine import Pin, PWM
 import micropython
+from esp32 import NVS
 
 # --- Third-party libraries ---
 # https://github.com/wybiral/micropython-aioweb
@@ -25,11 +26,10 @@ STATE_NAMES = {
 }
 current_state = STATE_BOOTING
 error_message = ""
-last_run = "Never"
+last_run = 0
+last_run_msg = "Never"
 status_message = ""
-
-# --- Web App and Logger ---
-app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
+log_msg = ""
 
 def fmt_time(lt):
     return f"{lt[0]:04d}-{lt[1]:02d}-{lt[2]:02d} {lt[3]:02d}:{lt[4]:02d}:{lt[5]:02d}"
@@ -37,13 +37,16 @@ def fmt_time(lt):
 
 def log(level, msg):
     """Simple logging function with timestamps."""
+    global log_msg
+
     try:
         # Format time if NTP has been set
         ts = fmt_time(localtime())
     except TypeError:
         # Fallback to seconds since boot if time not set
         ts = f"{time.ticks_ms()//1000}s"
-    print(f"[{ts}] [{level.upper()}] {msg}")
+    log_msg = f"[{ts}] [{level.upper()}] {msg}"
+    print(log_msg)
 
 # --- Hardware Abstraction Classes ---
 
@@ -54,7 +57,7 @@ class Meter:
         self.fast_irq = 0
         self.pin = Pin(in_pin, Pin.IN)
         self.monitor = Pin(monitor_pin, Pin.OUT, value=0)
-        self.last_tick = 0
+        self.last_tick = time.ticks_us()
         self.monitor_state = True
         self.pin.irq(handler=self.cb, trigger=Pin.IRQ_RISING)
 
@@ -68,6 +71,9 @@ class Meter:
         self.counter += 1
         self.monitor.value(self.monitor_state) # Toggle monitor pin for debugging
         self.monitor_state = not self.monitor_state
+
+    def set(self, value):
+        self.counter = value
 
     def __repr__(self):
         return str(self.counter)
@@ -121,6 +127,10 @@ led = AsyncBlink(config.LED_PIN)
 pump = PWM(Pin(config.PUMP_PIN), freq=config.PUMP_PWM_FREQ, duty_u16=0)
 meter = Meter(config.METER_PIN, config.MONITOR_PIN)
 valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
+task_cycle = None
+nvs = NVS("ic")
+app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
+
 
 # --- Core Logic Functions ---
 
@@ -194,7 +204,7 @@ async def valve_ml(valve, ml):
 
 async def run_cycle():
     """Runs a full irrigation cycle based on the 'program' dictionary."""
-    global current_state, error_message, last_run, status_message
+    global current_state, error_message, last_run_msg, last_run, status_message
     if current_state != STATE_IDLE:
         log("WARN", "Cannot start cycle, system is not idle.")
         return
@@ -216,10 +226,12 @@ async def run_cycle():
         end_time = time.ticks_ms()
         duration = time.ticks_diff(end_time, start_time)
         total_water = (end_cnt - start_cnt) / config.PULSES_PER_LITER
-        lt = fmt_time(localtime())
-        last_run = f"Cycle completed successfully at [{lt}]. Total Time: {duration / 1000:.2f}s Total Water: {total_water:.3f}L"
+        last_run = time.time()
+        lt = fmt_time(localtime(last_run))
+        last_run_msg = f"Cycle completed successfully at [{lt}]. Total Time: {duration / 1000:.2f}s Total Water: {total_water:.3f}L"
+        nvs.set_i32("last_run", last_run)
         status_message = ""
-        log("INFO", last_run)
+        log("INFO", last_run_msg)
     except Exception as e:
         error_message = f"Cycle failed: {e}"
         log("ERROR", error_message)
@@ -229,6 +241,9 @@ async def run_cycle():
         open_valve(0)
         await asyncio.sleep_ms(500) # Give valves time to close
         pump_stop()
+        nvs.set_i32("cnt", meter.counter)
+        nvs.commit()
+        log("INFO", "Water meter saved in NVS.")
         if current_state != STATE_ERROR:
             current_state = STATE_IDLE
 
@@ -243,15 +258,20 @@ async def index(r,w):
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>body{{font-family:sans-serif;}}</style></head><body>
     <h1>Irrigation Controller</h1>
+    <p><strong>Current_time:</strong> {fmt_time(localtime())}</p>
     <p><strong>State:</strong> {status_name}</p>
     <p>{status_message}</p>
-    <p><strong>Last Irrigation:</strong> {last_run}</p>
+    <p><strong>Last Irrigation:</strong> {fmt_time(localtime(last_run))}: {last_run_msg}</p>
     <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.counter} pulses)</p>
     <p><strong>Last Error:</strong> {error_message or "None"}</p>
     <p><string><a href="/program">Program</a></p>
     <form action="/run" method="post">
         <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
     </form>
+    <form action="/stop" method="post">
+        <button type="submit" style="padding:10px;">Stop</button>
+    </form>
+    <p>Last message: <pre>{log_msg}</pre></p>
     </body></html>
     """
 
@@ -262,9 +282,12 @@ async def index(r,w):
 @app.route('/run', methods=['POST'])
 async def run_cycle_request(r,w):
     """Triggers the irrigation cycle via a POST request."""
+
+    global task_cycle
+
     log("INFO", "Run cycle triggered via web interface.")
     if current_state == STATE_IDLE:
-        asyncio.create_task(run_cycle())
+        task_cycle = asyncio.create_task(run_cycle())
         msg, code = "Cycle started", 200
     else:
         msg, code = "System is not idle, cannot start cycle.", 409
@@ -272,6 +295,25 @@ async def run_cycle_request(r,w):
     html = f"""<html><head></head><body><h1>{msg}</h1></body></html>"""
     w.write(html.encode("utf8"))
     await w.drain()
+
+
+@app.route('/stop', methods=['POST'])
+async def stop_cycle_request(r,w):
+    """Triggers the irrigation cycle via a POST request."""
+
+    global task_cycle
+
+    log("INFO", "Stop current cycle via web interface.")
+    if current_state == STATE_RUNNING_CYCLE and isinstance(task_cycle, asyncio.Task):
+        task_cycle.cancel()
+        msg, code = "Cycle canceled", 200
+    else:
+        msg, code = "No task active", 409
+    w.write(f"HTTP/1.0 {code} OK\r\nRefresh: 3;url=/\r\nContent-Type: text/html\r\n\r\n".encode("utf8"))
+    html = f"""<html><head></head><body><h1>{msg}</h1></body></html>"""
+    w.write(html.encode("utf8"))
+    await w.drain()
+
 
 @app.route('/program')
 async def print_program(r,w):
@@ -282,8 +324,18 @@ async def print_program(r,w):
 
 # --- Main Application Logic ---
 async def main():
-    global current_state, error_message
+    global current_state, error_message, last_run
     
+    # load meter from NV storage:
+    try:
+        stored_counter = nvs.get_i32("cnt")
+        meter.set(stored_counter)
+        last_run = nvs.get_i32("last_run")
+        log("INFO", f"Water meter restored to {stored_counter}")
+    except OSError:
+        log("WARNING", "Stored value for meter not found!")
+        pass
+
     # Start the web server as a background task
     try:
         asyncio.create_task(app.serve())
@@ -340,5 +392,6 @@ if __name__ == "__main__":
         log("CRITICAL", f"A critical error occurred in main: {e}")
     finally:
         pump_stop()
+        open_valve(0)
         led.stop()
         log("INFO", "System halted. Cleanup complete.")
