@@ -258,6 +258,38 @@ async def watchdog():
         await asyncio.sleep(1)
 
 # --- Web Server Routes ---
+
+
+BUF_LEN=256
+buf = bytearray(BUF_LEN)
+
+async def serve_file(r, w, filename, mime=b"text/html"):
+
+    try:
+        with open(filename, "rb") as f:
+            await w.awrite(b"HTTP/1.0 200 OK\r\nContent-type: " + mime + "\r\n\r\n")
+            while True:
+                n = f.readinto(buf)
+                if n == 0:
+                    break
+                await w.awrite(buf[:n])
+    except OSError:
+        await w.awrite(b'HTTP/1.0 404 Not Found\r\n\r\n')
+    finally:
+        await w.drain()
+
+
+@app.route("/static")
+async def static(r,w):
+
+    filename = "/static/" + r.query
+    if r.query.endswith(b'.html'):
+        mime = b'text/html'
+    else:
+        mime = b'text/plain'
+    await serve_file(r, w, filename, mime)
+
+
 @app.route('/')
 async def index(r,w):
     """Main status page for the web interface."""
@@ -275,6 +307,7 @@ async def index(r,w):
     <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.counter} pulses)</p>
     <p><strong>Last Error:</strong> {error_message or "None"}</p>
     <p><string><a href="/program">Program</a></p>
+    <p><a href="/static?config.html">Config</a></p>
     <form action="/run" method="post">
         <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
     </form>

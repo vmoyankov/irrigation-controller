@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Configuration</title>
+    <style>
+        /* Basic styling for a clean, minimal look */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #1a202c;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-group input[type="number"],
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input[type="number"]:focus,
+        .form-group input[type="text"]:focus {
+            border-color: #4a90e2;
+            outline: none;
+        }
+
+        .volume-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .button-container {
+            text-align: center;
+        }
+
+        #save-button {
+            background-color: #4a90e2;
+            color: #fff;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 700;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        #save-button:hover {
+            background-color: #357bd8;
+        }
+        
+        #save-button:active {
+            transform: scale(0.98);
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            min-height: 20px;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Device Configuration</h1>
+    <p id="status"></p>
+
+    <div class="form-group">
+        <label for="pump-power">Pump Power (%)</label>
+        <input type="number" id="pump-power" min="0" max="100" placeholder="0 - 100" />
+    </div>
+
+    <div class="form-group">
+        <label>Schedule (HH:MM)</label>
+        <div style="display: flex; gap: 10px;">
+            <input type="number" id="schedule-hour" min="0" max="23" placeholder="Hour (0-23)" style="flex: 1;" />
+            <input type="number" id="schedule-minute" min="0" max="59" placeholder="Minute (0-59)" style="flex: 1;" />
+        </div>
+    </div>
+
+    <h3>Volumes (ml)</h3>
+    <div class="volume-grid">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-1">Volume 1</label>
+            <input type="number" id="volume-1" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-2">Volume 2</label>
+            <input type="number" id="volume-2" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-3">Volume 3</label>
+            <input type="number" id="volume-3" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-4">Volume 4</label>
+            <input type="number" id="volume-4" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-5">Volume 5</label>
+            <input type="number" id="volume-5" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-6">Volume 6</label>
+            <input type="number" id="volume-6" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-7">Volume 7</label>
+            <input type="number" id="volume-7" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-8">Volume 8</label>
+            <input type="number" id="volume-8" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-9">Volume 9</label>
+            <input type="number" id="volume-9" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-10">Volume 10</label>
+            <input type="number" id="volume-10" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-11">Volume 11</label>
+            <input type="number" id="volume-11" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="volume-12">Volume 12</label>
+            <input type="number" id="volume-12" class="volume-input" min="10" max="2000" placeholder="10 - 2000" />
+        </div>
+    </div>
+
+    <div class="button-container">
+        <button id="save-button">Save Configuration</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const statusElement = document.getElementById('status');
+        const saveButton = document.getElementById('save-button');
+        const volumes = [];
+        for (let i = 1; i <= 12; i++) {
+            volumes.push(document.getElementById(`volume-${i}`));
+        }
+        const pumpPowerInput = document.getElementById('pump-power');
+        const scheduleHourInput = document.getElementById('schedule-hour');
+        const scheduleMinuteInput = document.getElementById('schedule-minute');
+        
+        const showStatus = (message, isError = false) => {
+            statusElement.textContent = message;
+            statusElement.className = isError ? 'status-error' : 'status-success';
+        };
+
+        const loadConfig = async () => {
+            try {
+                showStatus('Loading configuration...');
+                const response = await fetch('/config', { method: 'GET' });
+                if (!response.ok) {
+                    throw new Error(`Server returned status: ${response.status}`);
+                }
+                const config = await response.json();
+                
+                // Populate the form fields with the loaded values
+                volumes.forEach((input, index) => {
+                    const volumeValue = config.volumes[index];
+                    input.value = (volumeValue === null || volumeValue === undefined) ? '' : volumeValue;
+                });
+                
+                pumpPowerInput.value = config.pumpPower;
+                scheduleHourInput.value = config.schedule.hour;
+                scheduleMinuteInput.value = config.schedule.minute;
+
+                showStatus('Configuration loaded successfully.');
+
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+                showStatus(`Failed to load configuration: ${error.message}`, true);
+            }
+        };
+
+        const saveConfig = async (event) => {
+            event.preventDefault();
+            
+            // Collect all form data
+            const configData = {
+                volumes: volumes.map(input => {
+                    const value = parseInt(input.value);
+                    // Return null if the field is empty, otherwise return the parsed integer
+                    return isNaN(value) ? null : value;
+                }),
+                pumpPower: parseInt(pumpPowerInput.value),
+                schedule: {
+                    hour: parseInt(scheduleHourInput.value),
+                    minute: parseInt(scheduleMinuteInput.value)
+                }
+            };
+            
+            try {
+                showStatus('Saving configuration...');
+                saveButton.disabled = true; // Disable button to prevent multiple submissions
+                const response = await fetch('/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(configData),
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned status: ${response.status}`);
+                }
+                
+                showStatus('Configuration saved successfully.');
+
+            } catch (error) {
+                console.error('Error saving configuration:', error);
+                showStatus(`Failed to save configuration: ${error.message}`, true);
+            } finally {
+                saveButton.disabled = false; // Re-enable the button
+            }
+        };
+
+        // Attach event listeners
+        saveButton.addEventListener('click', saveConfig);
+
+        // Load configuration on page load
+        loadConfig();
+    });
+</script>
+
+</body>
+</html>
