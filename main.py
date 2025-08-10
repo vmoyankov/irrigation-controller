@@ -6,6 +6,7 @@ import network
 from machine import Pin, PWM, WDT
 import micropython
 from esp32 import NVS
+import json
 
 # --- Third-party libraries ---
 # https://github.com/wybiral/micropython-aioweb
@@ -13,8 +14,7 @@ import web
 from tz import localtime
 
 # --- Project modules ---
-import config  # Our new configuration file
-from program import program
+import config
 
 # Allocate buffer for micropython to handle exceptions in IRQs
 micropython.alloc_emergency_exception_buf(100)
@@ -132,6 +132,7 @@ task_cycle = None
 nvs = NVS("ic")
 app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
 wdt = None
+settings = config.DEFAULT_SETTINGS
 
 
 # --- Core Logic Functions ---
@@ -148,7 +149,7 @@ def open_valve(valve_id):
 
 def pump_start():
     log("INFO", "Pump START")
-    pump.duty_u16(config.PUMP_DUTY_CYCLE)
+    pump.duty_u16(settings.get("pumpPower", config.PUMP_POWER) * 65536 // 100)
 
 def pump_stop():
     log("INFO", "Pump STOP")
@@ -185,6 +186,10 @@ async def valve_ml(valve, ml):
     global error_message, status_message
 
     """Dispenses a specific amount of water from a valve."""
+    if ml is None or ml == 0:
+        log("INFO", f"Zero amount for valve {valve}")
+        return
+
     timeout_ms = ml * config.MIN_FLOW_S_PER_L
     pulses_needed = int(ml * config.PULSES_PER_LITER / 1000)
     status_message = f"Dispensing {ml}ml from valve {valve} ({pulses_needed} pulses)"
@@ -257,6 +262,31 @@ async def watchdog():
         wdt.feed()
         await asyncio.sleep(1)
 
+
+def load_settings():
+    """Load settings from NVS, or from config file"""
+    
+    global settings
+    buf = bytearray(1024)
+    try:
+        nvs.get_blob('settings', buf)
+        settings = json.loads(buf)
+        log("INFO", "Settings loaded from NVS")
+    except OSError:
+        settings = config.DEFAULT_SETTINGS
+        log("INFO", "Settings loaded with DEFAULT values from Flash")
+
+
+def save_settings():
+    """Save settings into NVS"""
+
+    global settings
+    buf = json.dumps(settings).encode()
+    nvs.set_blob("settings", buf)
+    nvs.commit()
+    log("INFO", f"Settings stored into NVS, {len(buf)} bytes")
+
+
 # --- Web Server Routes ---
 
 
@@ -267,7 +297,7 @@ async def serve_file(r, w, filename, mime=b"text/html"):
 
     try:
         with open(filename, "rb") as f:
-            await w.awrite(b"HTTP/1.0 200 OK\r\nContent-type: " + mime + "\r\n\r\n")
+            await w.awrite(b"HTTP/1.0 200 OK\r\nContent-type: " + mime + b"\r\n\r\n")
             while True:
                 n = f.readinto(buf)
                 if n == 0:
@@ -306,7 +336,6 @@ async def index(r,w):
     <p><strong>Last Irrigation:</strong> {fmt_time(localtime(last_run))}: {last_run_msg}</p>
     <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.counter} pulses)</p>
     <p><strong>Last Error:</strong> {error_message or "None"}</p>
-    <p><string><a href="/program">Program</a></p>
     <p><a href="/static?config.html">Config</a></p>
     <form action="/run" method="post">
         <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
@@ -330,6 +359,7 @@ async def run_cycle_request(r,w):
 
     log("INFO", "Run cycle triggered via web interface.")
     if current_state == STATE_IDLE:
+        program = dict(enumerate(settings["volumes"], start=1))
         task_cycle = asyncio.create_task(run_cycle(program))
         msg, code = "Cycle started", 200
     else:
@@ -358,12 +388,30 @@ async def stop_cycle_request(r,w):
     await w.drain()
 
 
-@app.route('/program')
-async def print_program(r,w):
-    html = str(program)
-    w.write(b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n")
-    w.write(html.encode("utf8"))
+@app.route('/config', methods=['GET'])
+async def get_config(r,w):
+    load_settings()
+    await w.awrite(b"HTTP/1.0 200 OK\r\nContent-type: application/json\r\n\r\n")
+    await w.awrite(json.dumps(settings).encode())
     await w.drain()
+
+
+@app.route('/config', methods=['POST'])
+async def post_config(r,w):
+    global settings
+
+    buf = await r.read(1024)
+    try:
+        s = json.loads(buf)
+        settings = s
+        log("INFO", "Settings updated from web")
+        save_settings()
+        w.write(b"HTTP/1.0 200 OK\r\n\r\n")
+    except ValueError:
+        log("ERROR", f"Bad settings request from web {buf}")
+        w.write(b"HTTP/1.0 400 Bad Request\r\n\r\n")
+    await w.drain()
+
 
 # --- Main Application Logic ---
 async def main():
@@ -382,6 +430,8 @@ async def main():
     except OSError:
         log("WARNING", "Stored value for meter not found!")
         pass
+
+    load_settings()
 
     # Start the web server as a background task
     try:

@@ -18,10 +18,31 @@ VALVE_BUS_PINS = (21, 20, 10, 7) # The 4 pins controlling the valve matrix
 # --- Operational Parameters ---
 # Fine-tune the system's behavior.
 PUMP_PWM_FREQ = 2000
-PUMP_DUTY_CYCLE = 20000     # Pump power (0-65535 for duty_u16)
+PUMP_POWER = 30             # Pump power in % (0-100)
 PUMP_RAMP_UP_TIME_S = 2.0   # Seconds to wait for pump to build pressure
 PULSES_PER_LITER = 3250     # Pulses from the flow meter that equal 1 liter
 MIN_FLOW_S_PER_L = 240      # Max seconds per liter before a timeout occurs
 
 # --- Web Server Configuration ---
 WEB_SERVER_PORT = 80
+DEFAULT_SETTINGS = {
+    "volumes": [
+        750,  # 1
+        800,  # 2
+        1000, # 3
+        650,  # 4
+        300,  # 5
+        900,  # 6
+        300,  # 7
+        550,  # 8
+        None, # 9
+        None, # 10
+        None, # 11
+        None, # 12
+    ],
+    "pumpPower": 30,
+    "schedule": {
+        "hour": 21,
+        "minute": 30,
+    },
+}
