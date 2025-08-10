@@ -1,4 +1,4 @@
-Watering Controller
+Irrigation Controller
 ====================
 
 Schematics:
