@@ -302,7 +302,7 @@ async def serve_file(r, w, filename, mime=b"text/html"):
                 n = f.readinto(buf)
                 if n == 0:
                     break
-                await w.awrite(buf[:n])
+                await w.awrite(buf, sz=n)
     except OSError:
         await w.awrite(b'HTTP/1.0 404 Not Found\r\n\r\n')
     finally:
