@@ -1,3 +1,5 @@
+# https://github.com/wybiral/micropython-aioweb
+
 import uasyncio as asyncio
 from hashlib import sha1
 from binascii import b2a_base64
