@@ -1,8 +1,9 @@
 # main.py
+import os
 import uasyncio as asyncio
 import time
 import network
-from machine import Pin, PWM
+from machine import Pin, PWM, WDT
 import micropython
 from esp32 import NVS
 
@@ -130,6 +131,7 @@ valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
 task_cycle = None
 nvs = NVS("ic")
 app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
+wdt = None
 
 
 # --- Core Logic Functions ---
@@ -202,7 +204,8 @@ async def valve_ml(valve, ml):
     pulses_dispensed = meter.counter - start_cnt
     log("INFO", f"  -> Closed valve {valve}. Dispensed {pulses_dispensed} pulses in {duration/1000:.1f}s.")
 
-async def run_cycle():
+
+async def run_cycle(program):
     """Runs a full irrigation cycle based on the 'program' dictionary."""
     global current_state, error_message, last_run_msg, last_run, status_message
     if current_state != STATE_IDLE:
@@ -247,6 +250,13 @@ async def run_cycle():
         if current_state != STATE_ERROR:
             current_state = STATE_IDLE
 
+async def watchdog():
+    global wdt
+
+    while True:
+        wdt.feed()
+        await asyncio.sleep(1)
+
 # --- Web Server Routes ---
 @app.route('/')
 async def index(r,w):
@@ -287,7 +297,7 @@ async def run_cycle_request(r,w):
 
     log("INFO", "Run cycle triggered via web interface.")
     if current_state == STATE_IDLE:
-        task_cycle = asyncio.create_task(run_cycle())
+        task_cycle = asyncio.create_task(run_cycle(program))
         msg, code = "Cycle started", 200
     else:
         msg, code = "System is not idle, cannot start cycle.", 409
@@ -324,8 +334,12 @@ async def print_program(r,w):
 
 # --- Main Application Logic ---
 async def main():
-    global current_state, error_message, last_run
+    global current_state, error_message, last_run, wdt
     
+    # Start watchdog
+    wdt = WDT(timeout=10000)
+    asyncio.create_task(watchdog())
+
     # load meter from NV storage:
     try:
         stored_counter = nvs.get_i32("cnt")
