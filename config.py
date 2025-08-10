@@ -18,7 +18,6 @@ VALVE_BUS_PINS = (21, 20, 10, 7) # The 4 pins controlling the valve matrix
 # --- Operational Parameters ---
 # Fine-tune the system's behavior.
 PUMP_PWM_FREQ = 2000
-PUMP_POWER = 30             # Pump power in % (0-100)
 PUMP_RAMP_UP_TIME_S = 2.0   # Seconds to wait for pump to build pressure
 PULSES_PER_LITER = 3250     # Pulses from the flow meter that equal 1 liter
 MIN_FLOW_S_PER_L = 240      # Max seconds per liter before a timeout occurs

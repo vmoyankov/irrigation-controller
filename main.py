@@ -125,7 +125,7 @@ valves = (
 # --- Global Object Instantiation ---
 # Using constants from config.py
 led = AsyncBlink(config.LED_PIN)
-pump = PWM(Pin(config.PUMP_PIN), freq=config.PUMP_PWM_FREQ, duty_u16=0)
+pump = PWM(Pin(config.PUMP_PIN), freq=config.PUMP_PWM_FREQ, duty=0)
 meter = Meter(config.METER_PIN, config.MONITOR_PIN)
 valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
 task_cycle = None
@@ -149,11 +149,11 @@ def open_valve(valve_id):
 
 def pump_start():
     log("INFO", "Pump START")
-    pump.duty_u16(settings.get("pumpPower", config.PUMP_POWER) * 65536 // 100)
+    pump.duty(settings.get("pumpPower", 50) * 1023 // 100)
 
 def pump_stop():
     log("INFO", "Pump STOP")
-    pump.duty_u16(0)
+    pump.duty(0)
 
 async def do_connect():
     """Connects to WiFi, non-blocking."""
