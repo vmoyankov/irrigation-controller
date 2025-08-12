@@ -3,7 +3,7 @@ import os
 import uasyncio as asyncio
 import time
 import network
-from machine import Pin, PWM, WDT
+from machine import Pin, PWM, WDT, Counter
 import micropython
 from esp32 import NVS
 import json
@@ -50,34 +50,6 @@ def log(level, msg):
     print(log_msg)
 
 # --- Hardware Abstraction Classes ---
-
-class Meter:
-    """Handles the flow meter using a hardware interrupt for precision."""
-    def __init__(self, in_pin, monitor_pin):
-        self.counter = 0
-        self.fast_irq = 0
-        self.pin = Pin(in_pin, Pin.IN)
-        self.monitor = Pin(monitor_pin, Pin.OUT, value=0)
-        self.last_tick = time.ticks_us()
-        self.monitor_state = True
-        self.pin.irq(handler=self.cb, trigger=Pin.IRQ_RISING)
-
-    def cb(self, pin):
-        """Interrupt Service Routine: Must be lean and fast."""
-        now = time.ticks_us()
-        if time.ticks_diff(now, self.last_tick) < 1000: # Debounce
-            self.fast_irq += 1
-            return
-        self.last_tick = now
-        self.counter += 1
-        self.monitor.value(self.monitor_state) # Toggle monitor pin for debugging
-        self.monitor_state = not self.monitor_state
-
-    def set(self, value):
-        self.counter = value
-
-    def __repr__(self):
-        return str(self.counter)
 
 class AsyncBlink:
     """Manages the status LED using an asyncio task."""
@@ -126,7 +98,7 @@ valves = (
 # Using constants from config.py
 led = AsyncBlink(config.LED_PIN)
 pump = PWM(Pin(config.PUMP_PIN), freq=config.PUMP_PWM_FREQ, duty=0)
-meter = Meter(config.METER_PIN, config.MONITOR_PIN)
+meter = Counter(0, Pin(in_pin, Pin.IN), filter_ns=1_000_000)
 valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
 task_cycle = None
 nvs = NVS("ic")
@@ -195,18 +167,18 @@ async def valve_ml(valve, ml):
     status_message = f"Dispensing {ml}ml from valve {valve} ({pulses_needed} pulses)"
     log("INFO", status_message)
     
-    start_cnt = meter.counter
+    start_cnt = meter.value()
     start_time = time.ticks_ms()
     open_valve(valve)
     
-    while (meter.counter < start_cnt + pulses_needed):
+    while (meter.value() < start_cnt + pulses_needed):
         if time.ticks_diff(time.ticks_ms(), start_time) > timeout_ms:
             log("WARN", f"  Timeout dispensing from valve {valve}")
             break
         await asyncio.sleep_ms(10)
     
     duration = time.ticks_diff(time.ticks_ms(), start_time)
-    pulses_dispensed = meter.counter - start_cnt
+    pulses_dispensed = meter.value() - start_cnt
     log("INFO", f"  -> Closed valve {valve}. Dispensed {pulses_dispensed} pulses in {duration/1000:.1f}s.")
 
 
@@ -224,13 +196,13 @@ async def run_cycle(program):
     pump_start()
     await asyncio.sleep(config.PUMP_RAMP_UP_TIME_S)
 
-    start_cnt = meter.counter
+    start_cnt = meter.value()
     start_time = time.ticks_ms()
     try:
         for v, ml in sorted(program.items()):
             await valve_ml(v, ml)
 
-        end_cnt = meter.counter
+        end_cnt = meter.value()
         end_time = time.ticks_ms()
         duration = time.ticks_diff(end_time, start_time)
         total_water = (end_cnt - start_cnt) / config.PULSES_PER_LITER
@@ -249,7 +221,7 @@ async def run_cycle(program):
         open_valve(0)
         await asyncio.sleep_ms(500) # Give valves time to close
         pump_stop()
-        nvs.set_i32("cnt", meter.counter)
+        nvs.set_i32("cnt", meter.value())
         nvs.commit()
         log("INFO", "Water meter saved in NVS.")
         if current_state != STATE_ERROR:
@@ -324,7 +296,7 @@ async def static(r,w):
 async def index(r,w):
     """Main status page for the web interface."""
     status_name = STATE_NAMES.get(current_state, "UNKNOWN")
-    liters = meter.counter / config.PULSES_PER_LITER
+    liters = meter.value() / config.PULSES_PER_LITER
     html = f"""
     <!DOCTYPE html><html><head><title>Irrigation Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -334,7 +306,7 @@ async def index(r,w):
     <p><strong>State:</strong> {status_name}</p>
     <p>{status_message}</p>
     <p><strong>Last Irrigation:</strong> {fmt_time(localtime(last_run))}: {last_run_msg}</p>
-    <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.counter} pulses)</p>
+    <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.value()} pulses)</p>
     <p><strong>Last Error:</strong> {error_message or "None"}</p>
     <p><a href="/static?config.html">Config</a></p>
     <form action="/run" method="post">
@@ -424,7 +396,7 @@ async def main():
     # load meter from NV storage:
     try:
         stored_counter = nvs.get_i32("cnt")
-        meter.set(stored_counter)
+        meter.value(stored_counter)
         last_run = nvs.get_i32("last_run")
         log("INFO", f"Water meter restored to {stored_counter}")
     except OSError:
