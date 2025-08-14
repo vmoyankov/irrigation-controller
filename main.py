@@ -23,7 +23,7 @@ micropython.alloc_emergency_exception_buf(100)
 
 error_message = ""
 last_run = 0
-last_run_msg = "Never"
+last_run_msg = ""
 status_message = ""
 log_msg = ""
 
