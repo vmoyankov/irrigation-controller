@@ -300,7 +300,7 @@ async def watchdog():
 async def scheduler():
     global last_run, task_cycle
 
-    def should_run(hr, min_, window=1800, min_period=12*60):
+    def should_run(hr, min_, window=1800, min_period=12*60*60):
         now = time.time()
         local = localtime(now)
         target_time = mktime((local[0], local[1], local[2], hr, min_, 0, 0, 0))
