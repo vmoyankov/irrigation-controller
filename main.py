@@ -20,11 +20,8 @@ except AttributeError:
     class Counter:
         """ dummy counter to allow tests """
 
-        def __init__(self, *args, **kwargs):
-            pass
-
         def value(self, value=None):
-            pass
+            return 0
 
 
 # --- Project modules ---
