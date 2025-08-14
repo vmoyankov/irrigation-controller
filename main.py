@@ -334,7 +334,7 @@ async def scheduler():
             else:
                 log("WARNING", f"Scheduler: not IDLE: {current_state.text()}")
 
-        await asyncio.sleep(60)
+        await asyncio.sleep(60 - lt[5])
 
 
 
