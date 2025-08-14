@@ -297,6 +297,44 @@ async def watchdog():
         await asyncio.sleep(1)
 
 
+async def scheduler():
+    global last_run, task_cycle
+
+    def should_run(hr, min_, window=1800, min_repeat=12*60):
+        now = time.time()
+        local = localtime(now)
+        target_time = time.mktime((local[0], local[1], local[2], hr, min_, 0, 0, 0))
+
+        if local[0] < 2025: # we don't know the real time; cancel
+            log("WARNING", f"Time is incorrect: {fmt_time(local)}. Reject the scheduler")
+            return False
+
+        # Allow tolerance window (e.g. 30 mins past)
+        if now >= target_time and now - target_time < window:  # 30 mins window
+            if now - last_run > min_repeat:
+                return True
+        return False
+
+    log("INFO", "Scheduler started")
+    while True:
+        hour = settings["schedule"]["hour"]
+        minute = settings["schedule"]["minute"]
+        now = time.time()
+        lt = localtime(now)
+
+        if should_run(hour, minute):
+            log("INFO", "Scheduler: ready to run taks")
+            if current_state.get() == State.IDLE:
+                program = dict(enumerate(settings["volumes"], start=1))
+                task_cycle = asyncio.create_task(run_cycle(program))
+                log("INFO", f"Scheduler: task started at {fmt_time(lt)}")
+            else:
+                log("WARNING", f"Scheduler: not IDLE: {current_state.text()}")
+
+        await asyncio.sleep(60)
+
+
+
 def load_settings():
     """Load settings from NVS, or from config file"""
     
@@ -464,6 +502,9 @@ async def main():
         pass
 
     load_settings()
+
+    # Start scheduler
+    asyncio.create_task(scheduler())
 
     # Start the web server as a background task
     try:
