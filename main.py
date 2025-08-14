@@ -303,15 +303,15 @@ async def scheduler():
 
     def should_run(hr, min_, window=1800, min_period=12*60*60):
         now = time.time()
-        local = localtime(now)
-        target_time = mktime((local[0], local[1], local[2], hr, min_, 0, 0, 0))
+        lt = localtime(now)
+        target_time = mktime((lt[0], lt[1], lt[2], hr, min_, 0, 0, 0))
 
-        if local[0] < 2025: # we don't know the real time; cancel
-            log("WARNING", f"Time is incorrect: {fmt_time(local)}. Reject the scheduler")
+        if lt[0] < 2025: # we don't know the real time; cancel
+            log("WARNING", f"Time is incorrect: {fmt_time(lt)}. Reject the scheduler")
             return False
 
         # Allow tolerance window (e.g. 30 mins past)
-        log("DEBUG", f"should run(), now={now}, target={target_time}, last run {now-last_run} s ago, diff={now-target_time}")
+        log("DEBUG", f"Scheduler: now={now}, target={target_time}, diff={now-target_time}, last run {now-last_run} s ago")
         if now >= target_time and now - target_time < window:
             if now - last_run > min_period:
                 return True
@@ -319,7 +319,6 @@ async def scheduler():
 
     log("INFO", "Scheduler started")
     while True:
-        log("DEBUG", "Scheduler loop")
         hour = settings["schedule"]["hour"]
         minute = settings["schedule"]["minute"]
         now = time.time()
@@ -410,6 +409,8 @@ async def static(r,w):
 async def index(r,w):
     """Main status page for the web interface."""
     liters = meter.value() / config.PULSES_PER_LITER
+    hour = settings["schedule"]["hour"]
+    minute = settings["schedule"]["minute"]
     html = f"""
     <!DOCTYPE html><html><head><title>Irrigation Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -424,6 +425,7 @@ async def index(r,w):
     <p><a href="/static?config.html">Config</a></p>
     <form action="/run" method="post">
         <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
+        Automatic start at <strong>{hour}:{minute}</strong>
     </form>
     <form action="/stop" method="post">
         <button type="submit" style="padding:10px;">Stop</button>
