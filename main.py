@@ -98,7 +98,7 @@ valves = (
 # Using constants from config.py
 led = AsyncBlink(config.LED_PIN)
 pump = PWM(Pin(config.PUMP_PIN), freq=config.PUMP_PWM_FREQ, duty=0)
-meter = Counter(0, Pin(in_pin, Pin.IN), filter_ns=1_000_000)
+meter = Counter(0, Pin(config.METER_PIN, Pin.IN), filter_ns=1_000_000)
 valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
 task_cycle = None
 nvs = NVS("ic")
