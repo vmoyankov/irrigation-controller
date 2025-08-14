@@ -12,7 +12,7 @@ from neopixel import NeoPixel
 # --- Third-party libraries ---
 # https://github.com/wybiral/micropython-aioweb
 import web
-from tz import localtime
+from tz import localtime, mktime
 
 try:
     from machine import Counter
@@ -172,7 +172,9 @@ rgb = NeoPixel(Pin(config.RGB_PIN), 1)
 current_state = State()
 
 
+# #####################################
 # --- Core Logic Functions ---
+# #####################################
 
 def open_valve(valve_id):
     """Sets the valve bus pins to open a specific valve."""
@@ -252,6 +254,9 @@ async def run_cycle(program):
 
     current_state.set(State.RUNNING)
     log("INFO", "--- Starting Irrigation Cycle ---")
+    last_run = time.time()
+    nvs.set_i32("last_run", last_run)
+    nvs.commit()
     
     open_valve(0)
     pump_start()
@@ -267,10 +272,8 @@ async def run_cycle(program):
         end_time = time.ticks_ms()
         duration = time.ticks_diff(end_time, start_time)
         total_water = (end_cnt - start_cnt) / config.PULSES_PER_LITER
-        last_run = time.time()
-        lt = fmt_time(localtime(last_run))
+        lt = fmt_time(localtime())
         last_run_msg = f"Cycle completed successfully at [{lt}]. Total Time: {duration / 1000:.2f}s Total Water: {total_water:.3f}L"
-        nvs.set_i32("last_run", last_run)
         status_message = ""
         log("INFO", last_run_msg)
     except Exception as e:
@@ -300,23 +303,25 @@ async def watchdog():
 async def scheduler():
     global last_run, task_cycle
 
-    def should_run(hr, min_, window=1800, min_repeat=12*60):
+    def should_run(hr, min_, window=1800, min_period=12*60):
         now = time.time()
         local = localtime(now)
-        target_time = time.mktime((local[0], local[1], local[2], hr, min_, 0, 0, 0))
+        target_time = mktime((local[0], local[1], local[2], hr, min_, 0, 0, 0))
 
         if local[0] < 2025: # we don't know the real time; cancel
             log("WARNING", f"Time is incorrect: {fmt_time(local)}. Reject the scheduler")
             return False
 
         # Allow tolerance window (e.g. 30 mins past)
-        if now >= target_time and now - target_time < window:  # 30 mins window
-            if now - last_run > min_repeat:
+        log("DEBUG", f"should run(), now={now}, target={target_time}, last run {now-last_run} s ago, diff={now-target_time}")
+        if now >= target_time and now - target_time < window:
+            if now - last_run > min_period:
                 return True
         return False
 
     log("INFO", "Scheduler started")
     while True:
+        log("DEBUG", "Scheduler loop")
         hour = settings["schedule"]["hour"]
         minute = settings["schedule"]["minute"]
         now = time.time()
@@ -359,7 +364,9 @@ def save_settings():
     log("INFO", f"Settings stored into NVS, {len(buf)} bytes")
 
 
+# #####################################
 # --- Web Server Routes ---
+# #####################################
 
 
 BUF_LEN=256
@@ -484,7 +491,10 @@ async def post_config(r,w):
     await w.drain()
 
 
+# #####################################
 # --- Main Application Logic ---
+# #####################################
+
 async def main():
     global current_state, error_message, last_run
     
