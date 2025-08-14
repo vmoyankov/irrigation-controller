@@ -7,6 +7,7 @@ from machine import Pin, PWM, WDT, Counter
 import micropython
 from esp32 import NVS
 import json
+from neopixel import NeoPixel
 
 # --- Third-party libraries ---
 # https://github.com/wybiral/micropython-aioweb
@@ -19,13 +20,7 @@ import config
 # Allocate buffer for micropython to handle exceptions in IRQs
 micropython.alloc_emergency_exception_buf(100)
 
-# --- State Management ---
-STATE_BOOTING, STATE_CONNECTING_WIFI, STATE_IDLE, STATE_RUNNING_CYCLE, STATE_ERROR = range(5)
-STATE_NAMES = {
-    STATE_BOOTING: "BOOTING", STATE_CONNECTING_WIFI: "CONNECTING",
-    STATE_IDLE: "IDLE", STATE_RUNNING_CYCLE: "RUNNING", STATE_ERROR: "ERROR"
-}
-current_state = STATE_BOOTING
+
 error_message = ""
 last_run = 0
 last_run_msg = "Never"
@@ -76,6 +71,63 @@ class AsyncBlink:
             self.task = None
         self.led.off()
 
+class State:
+# --- State Management ---
+    (
+        BOOTING, 
+        CONNECTING, 
+        IDLE, 
+        RUNNING, 
+        ERROR
+    ) = range(5)
+
+    _STATE_NAMES = {
+        BOOTING: "BOOTING", 
+        CONNECTING: "CONNECTING",
+        IDLE: "IDLE", 
+        RUNNING: "RUNNING", 
+        ERROR: "ERROR"
+    }
+    _COLORS={
+        BOOTING: (0, 64, 128),
+        CONNECTING: (128, 128, 0),
+        IDLE: (0, 0, 128),
+        RUNNING: (0, 128, 0),
+        ERROR: (128, 0, 0),
+    }
+    _BLINK_FREQ = {
+        BOOTING: 10, 
+        CONNECTING: 3,
+        IDLE: 1, 
+        RUNNING: 2, 
+        ERROR: 5,
+    }
+
+    def __init__(self, state=BOOTING):
+        self.led = NeoPixel(Pin(config.RGB_PIN), 1)
+        self.led2 = AsyncBlink(config.LED_PIN)
+        self.set(state)
+
+    def set(self, state):
+        self.state = state
+        self.led[0] = self._COLORS.get(state, (32,32,32))
+        self.led.write()
+        self.led2.freq(self._BLINK_FREQ.get(state, 0.5))
+
+    def get(self):
+        return self.state
+
+    def text(self):
+        return self._STATE_NAMES.get(self.state, "UNKNOWN")
+
+    def off(self):
+        """call this when main loog exits"""
+        self.state = None
+        self.led[0] = (0,0,0)
+        self.led.write()
+        self.led2.stop()
+
+
 # --- Valve Matrix Definition (unchanged) ---
 valves = (
     (None, None, None, None),  # 0, All valves are closed
@@ -96,7 +148,6 @@ valves = (
 
 # --- Global Object Instantiation ---
 # Using constants from config.py
-led = AsyncBlink(config.LED_PIN)
 pump = PWM(Pin(config.PUMP_PIN), freq=config.PUMP_PWM_FREQ, duty=0)
 meter = Counter(0, Pin(config.METER_PIN, Pin.IN), filter_ns=1_000_000)
 valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
@@ -105,6 +156,8 @@ nvs = NVS("ic")
 app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
 wdt = None
 settings = config.DEFAULT_SETTINGS
+rgb = NeoPixel(Pin(config.RGB_PIN), 1)
+current_state = State()
 
 
 # --- Core Logic Functions ---
@@ -129,8 +182,6 @@ def pump_stop():
 
 async def do_connect():
     """Connects to WiFi, non-blocking."""
-    global current_state
-    led.freq(5)
     wlan = network.WLAN()
     wlan.active(True)
     if not wlan.isconnected():
@@ -139,13 +190,11 @@ async def do_connect():
         start_time = time.ticks_ms()
         while not wlan.isconnected():
             if time.ticks_diff(time.ticks_ms(), start_time) > config.WIFI_TIMEOUT:
-                led.freq(2)
                 log("ERROR", "WiFi connection timed out.")
                 return False
             await asyncio.sleep_ms(100)
     
     log("INFO", f"WiFi connected. IP: {wlan.ifconfig()[0]}")
-    led.freq(1)
     try:
         import ntptime
         ntptime.settime()
@@ -184,12 +233,12 @@ async def valve_ml(valve, ml):
 
 async def run_cycle(program):
     """Runs a full irrigation cycle based on the 'program' dictionary."""
-    global current_state, error_message, last_run_msg, last_run, status_message
-    if current_state != STATE_IDLE:
+    global error_message, last_run_msg, last_run, status_message
+    if current_state.get() != State.IDLE:
         log("WARN", "Cannot start cycle, system is not idle.")
         return
 
-    current_state = STATE_RUNNING_CYCLE
+    current_state.set(State.RUNNING)
     log("INFO", "--- Starting Irrigation Cycle ---")
     
     open_valve(0)
@@ -215,7 +264,7 @@ async def run_cycle(program):
     except Exception as e:
         error_message = f"Cycle failed: {e}"
         log("ERROR", error_message)
-        current_state = STATE_ERROR
+        current_state.set(State.ERROR)
     finally:
         log("INFO", "Cycle cleanup: closing all valves and stopping pump.")
         open_valve(0)
@@ -224,8 +273,8 @@ async def run_cycle(program):
         nvs.set_i32("cnt", meter.value())
         nvs.commit()
         log("INFO", "Water meter saved in NVS.")
-        if current_state != STATE_ERROR:
-            current_state = STATE_IDLE
+        if current_state.get() != State.ERROR:
+            current_state.set(State.IDLE)
 
 async def watchdog():
     global wdt
@@ -295,7 +344,6 @@ async def static(r,w):
 @app.route('/')
 async def index(r,w):
     """Main status page for the web interface."""
-    status_name = STATE_NAMES.get(current_state, "UNKNOWN")
     liters = meter.value() / config.PULSES_PER_LITER
     html = f"""
     <!DOCTYPE html><html><head><title>Irrigation Controller</title>
@@ -303,7 +351,7 @@ async def index(r,w):
     <style>body{{font-family:sans-serif;}}</style></head><body>
     <h1>Irrigation Controller</h1>
     <p><strong>Current_time:</strong> {fmt_time(localtime())}</p>
-    <p><strong>State:</strong> {status_name}</p>
+    <p><strong>State:</strong> {current_state.text()}</p>
     <p>{status_message}</p>
     <p><strong>Last Irrigation:</strong> {fmt_time(localtime(last_run))}: {last_run_msg}</p>
     <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.value()} pulses)</p>
@@ -330,7 +378,7 @@ async def run_cycle_request(r,w):
     global task_cycle
 
     log("INFO", "Run cycle triggered via web interface.")
-    if current_state == STATE_IDLE:
+    if current_state.get() == State.IDLE:
         program = dict(enumerate(settings["volumes"], start=1))
         task_cycle = asyncio.create_task(run_cycle(program))
         msg, code = "Cycle started", 200
@@ -349,7 +397,7 @@ async def stop_cycle_request(r,w):
     global task_cycle
 
     log("INFO", "Stop current cycle via web interface.")
-    if current_state == STATE_RUNNING_CYCLE and isinstance(task_cycle, asyncio.Task):
+    if current_state.get() == State.RUNNING and isinstance(task_cycle, asyncio.Task):
         task_cycle.cancel()
         msg, code = "Cycle canceled", 200
     else:
@@ -420,29 +468,25 @@ async def main():
         log("ERROR", f"Failed to start asyncio repl: {e}")
 
     while True:
-        state_name = STATE_NAMES.get(current_state, "UNKNOWN")
-        log("DEBUG", f"Main loop. Current state: {state_name}")
+        log("DEBUG", f"Main loop. Current state: {current_state.text()}")
 
-        if current_state == STATE_BOOTING:
-            current_state = STATE_CONNECTING_WIFI
+        if current_state.get() == State.BOOTING:
+            current_state.set(State.CONNECTING)
         
-        elif current_state == STATE_CONNECTING_WIFI:
+        elif current_state.get() == State.CONNECTING:
             if await do_connect():
-                current_state = STATE_IDLE
+                current_state.set(State.IDLE)
             else:
                 error_message = "Failed to connect to WiFi."
-                current_state = STATE_ERROR
+                current_state.set(State.ERROR)
         
-        elif current_state == STATE_IDLE:
-            led.freq(0.5) # Slow blink for idle
+        elif current_state.get() == State.IDLE:
             await asyncio.sleep(60)
             
-        elif current_state == STATE_RUNNING_CYCLE:
-            led.freq(5) # Fast blink for running
+        elif current_state.get() == State.RUNNING:
             await asyncio.sleep(1)
 
-        elif current_state == STATE_ERROR:
-            led.freq(10) # Very fast "panic" blink
+        elif current_state.get() == State.ERROR:
             log("ERROR", f"System in ERROR state: {error_message}")
             await asyncio.sleep(30) # Wait before retrying or halting
         
@@ -462,5 +506,5 @@ if __name__ == "__main__":
     finally:
         pump_stop()
         open_valve(0)
-        led.stop()
+        current_state.off()
         log("INFO", "System halted. Cleanup complete.")
