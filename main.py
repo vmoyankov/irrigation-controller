@@ -274,8 +274,8 @@ async def run_cycle(program):
         status_message = ""
         log("INFO", last_run_msg)
     except Exception as e:
-        error_message = f"Cycle failed: {e}"
-        log("ERROR", error_message)
+        last_run_msg  = f"Cycle failed: {e}"
+        log("ERROR", last_run_msg)
         current_state.set(State.ERROR)
     finally:
         log("INFO", "Cycle cleanup: closing all valves and stopping pump.")
@@ -283,6 +283,7 @@ async def run_cycle(program):
         await asyncio.sleep_ms(500) # Give valves time to close
         pump_stop()
         nvs.set_i32("cnt", meter.value())
+        nvs.set_blob("last_msg", last_run_msg)
         nvs.commit()
         log("INFO", "Water meter saved in NVS.")
         if current_state.get() != State.ERROR:
@@ -360,6 +361,15 @@ def save_settings():
     nvs.commit()
     log("INFO", f"Settings stored into NVS, {len(buf)} bytes")
 
+
+def load_last_message():
+    global last_run_msg 
+    buf = bytearray(254)
+    try:
+        n = nvs.get_blob('last_msg', buf)
+        last_run_msg = buf[:n].decode()
+    except OSError:
+        log("INFO", "No last run message saved")
 
 # #####################################
 # --- Web Server Routes ---
@@ -509,6 +519,7 @@ async def main():
         pass
 
     load_settings()
+    load_last_message()
 
     # Start scheduler
     asyncio.create_task(scheduler())
