@@ -3,7 +3,7 @@ import os
 import uasyncio as asyncio
 import time
 import network
-from machine import Pin, PWM, WDT, Counter
+from machine import Pin, PWM, WDT
 import micropython
 from esp32 import NVS
 import json
@@ -13,6 +13,19 @@ from neopixel import NeoPixel
 # https://github.com/wybiral/micropython-aioweb
 import web
 from tz import localtime
+
+try:
+    from machine import Counter
+except AttributeError:
+    class Counter:
+        """ dummy counter to allow tests """
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def value(self, value=None):
+            pass
+
 
 # --- Project modules ---
 import config
@@ -274,6 +287,7 @@ async def run_cycle(program):
         log("INFO", "Water meter saved in NVS.")
         if current_state.get() != State.ERROR:
             current_state.set(State.IDLE)
+
 
 async def watchdog():
     wdt = WDT(timeout=10000)
