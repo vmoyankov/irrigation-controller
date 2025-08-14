@@ -154,7 +154,6 @@ valve_bus_pins = [ Pin(x, Pin.IN) for x in config.VALVE_BUS_PINS ]
 task_cycle = None
 nvs = NVS("ic")
 app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT )
-wdt = None
 settings = config.DEFAULT_SETTINGS
 rgb = NeoPixel(Pin(config.RGB_PIN), 1)
 current_state = State()
@@ -277,7 +276,7 @@ async def run_cycle(program):
             current_state.set(State.IDLE)
 
 async def watchdog():
-    global wdt
+    wdt = WDT(timeout=10000)
 
     while True:
         wdt.feed()
@@ -435,10 +434,9 @@ async def post_config(r,w):
 
 # --- Main Application Logic ---
 async def main():
-    global current_state, error_message, last_run, wdt
+    global current_state, error_message, last_run
     
     # Start watchdog
-    wdt = WDT(timeout=10000)
     asyncio.create_task(watchdog())
 
     # load meter from NV storage:
