@@ -9,6 +9,7 @@ WIFI_TIMEOUT = 30000     # max connection time in ms
 
 # --- Hardware Pin Assignments ---
 # Define the GPIO pin numbers connected to your hardware.
+BUTTON_PIN = 9
 LED_PIN = 15
 RGB_PIN = 8
 PUMP_PIN = 14
@@ -23,6 +24,7 @@ PUMP_PWM_FREQ = 2000
 PUMP_RAMP_UP_TIME_S = 2.0   # Seconds to wait for pump to build pressure
 PULSES_PER_LITER = 1700     # Pulses from the flow meter that equal 1 liter
 MIN_FLOW_S_PER_L = 240      # Max seconds per liter before a timeout occurs
+TANK_SIZE = 85              # Liters
 
 # --- Web Server Configuration ---
 WEB_SERVER_PORT = 80

@@ -1,5 +1,5 @@
 # main.py
-import os
+import sys
 import uasyncio as asyncio
 import time
 import network
@@ -13,6 +13,7 @@ from neopixel import NeoPixel
 # https://github.com/wybiral/micropython-aioweb
 import web
 from tz import localtime, mktime
+import aiorepl
 
 try:
     from machine import Counter
@@ -123,6 +124,7 @@ class State:
         self.led[0] = self._COLORS.get(state, (32,32,32))
         self.led.write()
         self.led2.freq(self._BLINK_FREQ.get(state, 0.5))
+        log("DEBUG", f"State = {self.text()}")
 
     def get(self):
         return self.state
@@ -191,28 +193,6 @@ def pump_stop():
     log("INFO", "Pump STOP")
     pump.duty(0)
 
-async def do_connect():
-    """Connects to WiFi, non-blocking."""
-    wlan = network.WLAN()
-    wlan.active(True)
-    if not wlan.isconnected():
-        log("INFO", f"Connecting to network: {config.SSID}")
-        wlan.connect(config.SSID, config.WLAN_KEY)
-        start_time = time.ticks_ms()
-        while not wlan.isconnected():
-            if time.ticks_diff(time.ticks_ms(), start_time) > config.WIFI_TIMEOUT:
-                log("ERROR", "WiFi connection timed out.")
-                return False
-            await asyncio.sleep_ms(100)
-    
-    log("INFO", f"WiFi connected. IP: {wlan.ifconfig()[0]}")
-    try:
-        import ntptime
-        ntptime.settime()
-        log("INFO", f"Time set via NTP: {localtime()}")
-    except Exception as e:
-        log("WARN", f"Could not set time via NTP: {e}")
-    return True
 
 async def valve_ml(valve, ml):
     global error_message, status_message
@@ -324,14 +304,17 @@ async def scheduler():
         now = time.time()
         lt = localtime(now)
 
-        if should_run(hour, minute):
-            log("INFO", "Scheduler: ready to run taks")
-            if current_state.get() == State.IDLE:
-                program = dict(enumerate(settings["volumes"], start=1))
-                task_cycle = asyncio.create_task(run_cycle(program))
-                log("INFO", f"Scheduler: task started at {fmt_time(lt)}")
-            else:
-                log("WARNING", f"Scheduler: not IDLE: {current_state.text()}")
+        try:
+            if should_run(hour, minute):
+                log("INFO", "Scheduler: ready to run taks")
+                if current_state.get() == State.IDLE:
+                    program = dict(enumerate(settings["volumes"], start=1))
+                    task_cycle = asyncio.create_task(run_cycle(program))
+                    log("INFO", f"Scheduler: task started at {fmt_time(lt)}")
+                else:
+                    log("WARNING", f"Scheduler: not IDLE: {current_state.text()}")
+        except Exception as e:
+            sys.print_exception(e)
 
         await asyncio.sleep(60 - lt[5])
 
@@ -409,6 +392,7 @@ async def static(r,w):
 async def index(r,w):
     """Main status page for the web interface."""
     liters = meter.value() / config.PULSES_PER_LITER
+    tank = config.TANK_SIZE - liters
     hour = settings["schedule"]["hour"]
     minute = settings["schedule"]["minute"]
     html = f"""
@@ -421,11 +405,12 @@ async def index(r,w):
     <p>{status_message}</p>
     <p><strong>Last Irrigation:</strong> {fmt_time(localtime(last_run))}: {last_run_msg}</p>
     <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.value()} pulses)</p>
+    <p><strong>Remainig Water in the Tank:</strong> {tank:.1f}L</p>
     <p><strong>Last Error:</strong> {error_message or "None"}</p>
     <p><a href="/static?config.html">Config</a></p>
     <form action="/run" method="post">
         <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
-        Automatic start at <strong>{hour}:{minute}</strong>
+        Automatic start at <strong>{hour:02d}:{minute:02d}</strong>
     </form>
     <form action="/stop" method="post">
         <button type="submit" style="padding:10px;">Stop</button>
@@ -504,9 +489,57 @@ async def post_config(r,w):
 # --- Main Application Logic ---
 # #####################################
 
-async def main():
+
+async def do_connect():
+    """Connects to WiFi, async task, never returns."""
+    wlan = network.WLAN()
+    wlan.active(True)
+    while True:
+        log("DEBUG", "do_connect()")
+        try:
+            if not wlan.isconnected():
+                log("INFO", f"Connecting to network: {config.SSID}")
+                wlan.connect(config.SSID, config.WLAN_KEY)
+                start_time = time.ticks_ms()
+                while time.ticks_diff(time.ticks_ms(), start_time) < config.WIFI_TIMEOUT:
+                    if wlan.isconnected():
+                        break
+                    await asyncio.sleep_ms(100)
+            if wlan.isconnected():
+                log("INFO", f"WiFi connected. IP: {wlan.ifconfig()[0]}")
+                await asyncio.sleep(600)
+            else:
+                log("ERROR", "WiFi connection timed out. Retry in 15 sec")
+                wlan.active(False)
+                await asyncio.sleep(15)
+                wlan.active(True)
+        except Exception as e:
+            log("ERROR", f"do_connect() Exceprion {e}. Restarting")
+            await asyncio.sleep(3)
+
+
+async def sync_clock():
+    import ntptime
+    while True:
+        log("DEBUG", "sync_clock()")
+        try:
+            if current_state.get() == State.IDLE:
+                ntptime.settime()
+                log("INFO", f"Time set via NTP: {localtime()}. Next sync after 900 sec")
+                await asyncio.sleep(900)
+        except Exception as e:
+            log("WARN", f"Could not set time via NTP: {e}. Retry in 10 sec")
+        await asyncio.sleep(10)
+
+
+def main():
     global current_state, error_message, last_run
     
+    button = Pin(config.BUTTON_PIN, Pin.IN)
+    if not button.value():
+        log("INFO", "Button pressed. Exiting")
+        return
+
     # Start watchdog
     asyncio.create_task(watchdog())
 
@@ -514,8 +547,9 @@ async def main():
     try:
         stored_counter = nvs.get_i32("cnt")
         meter.value(stored_counter)
-        last_run = nvs.get_i32("last_run")
         log("INFO", f"Water meter restored to {stored_counter}")
+        last_run = nvs.get_i32("last_run")
+        log("INFO", f"last_run loaded: {last_run}")
     except OSError:
         log("WARNING", "Stored value for meter not found!")
         pass
@@ -523,55 +557,30 @@ async def main():
     load_settings()
     load_last_message()
 
+    current_state.set(State.IDLE)
+    # Start aio repl
+    asyncio.create_task(aiorepl.task())
+    log("INFO", "asyncio REPL started")
+
+    # Start the web server as a background task
+    asyncio.create_task(app.serve())
+    log("INFO", "Web server started on port {config.WEB_SERVER_PORT}.")
+
+    # Keep trying to (re-)connect to WLAN
+    asyncio.create_task(do_connect())
+
+    # Keep clock in sync with NTP
+    asyncio.create_task(sync_clock())
+
     # Start scheduler
     asyncio.create_task(scheduler())
 
-    # Start the web server as a background task
-    try:
-        asyncio.create_task(app.serve())
-        log("INFO", "Web server started on port {config.WEB_SERVER_PORT}.")
-    except Exception as e:
-        log("ERROR", f"Failed to start web server: {e}")
-
-    try:
-        import aiorepl
-        repl = asyncio.create_task(aiorepl.task())
-        log("INFO", "asyncio REPL started")
-    except Exception as e:
-        log("ERROR", f"Failed to start asyncio repl: {e}")
-
-    while True:
-        log("DEBUG", f"Main loop. Current state: {current_state.text()}")
-
-        if current_state.get() == State.BOOTING:
-            current_state.set(State.CONNECTING)
-        
-        elif current_state.get() == State.CONNECTING:
-            if await do_connect():
-                current_state.set(State.IDLE)
-            else:
-                error_message = "Failed to connect to WiFi."
-                current_state.set(State.ERROR)
-        
-        elif current_state.get() == State.IDLE:
-            await asyncio.sleep(60)
-            
-        elif current_state.get() == State.RUNNING:
-            await asyncio.sleep(1)
-
-        elif current_state.get() == State.ERROR:
-            log("ERROR", f"System in ERROR state: {error_message}")
-            await asyncio.sleep(30) # Wait before retrying or halting
-        
-        else:
-            log("WARNING", "Unknown state")
-            await asyncio.sleep(1)
-
+    asyncio.run_until_complete()
 
 # --- Program Entry Point ---
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         log("INFO", "Program stopped by user.")
     except Exception as e:
@@ -580,4 +589,4 @@ if __name__ == "__main__":
         pump_stop()
         open_valve(0)
         current_state.off()
-        log("INFO", "System halted. Cleanup complete.")
+        log("INFO", "System halted. Cleanup complete. Watchdog will restart in 10 secs.")
