@@ -21,9 +21,15 @@ try:
 except AttributeError:
     class Counter:
         """ dummy counter to allow tests """
+        def __init__(self, *argsi, **kwargs):
+            self.value_ = 0
 
         def value(self, value=None):
-            return 0
+            if value is not None:
+                oldv = self.value_
+                self.value_ = value
+                return oldv
+            return self.value_
 
 
 # --- Project modules ---
