@@ -477,9 +477,30 @@ async def get_config(r,w):
 async def post_config(r,w):
     global settings
 
+    def validate(settings):
+        try:
+            for v in settings["volumes"]:
+                if v is None or v == 0:
+                    continue
+                if v < 50 or v > 3000:
+                    return False
+            if settings["pumpPower"] < 10 or settings["pumpPower"] > 100:
+                return False
+            hh = settings["schedule"]["hour"]
+            mm = settings["schedule"]["minute"]
+            if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+                return False
+        except KeyError:
+            return False
+
+        return True
+
     buf = await r.read(1024)
     try:
         s = json.loads(buf)
+        if not validate(s):
+            log("WARNING", f"Settings updated with bad value - {s}. Ignore")
+            raise ValueError
         settings = s
         log("INFO", "Settings updated from web")
         save_settings()
@@ -587,7 +608,7 @@ def main():
 
     # Start the web server as a background task
     asyncio.create_task(app.serve())
-    log("INFO", "Web server started on port {config.WEB_SERVER_PORT}.")
+    log("INFO", f"Web server started on port {config.WEB_SERVER_PORT}.")
 
     # Keep trying to (re-)connect to WLAN
     asyncio.create_task(do_connect())
@@ -608,6 +629,7 @@ if __name__ == "__main__":
         log("INFO", "Program stopped by user.")
     except Exception as e:
         log("CRITICAL", f"A critical error occurred in main: {e}")
+        sys.print_exception(e)
     finally:
         pump_stop()
         open_valve(0)
