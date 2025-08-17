@@ -484,6 +484,19 @@ async def post_config(r,w):
     await w.drain()
 
 
+
+@app.route("/reset-tank", methods=['POST'])
+async def reset_tank(r,w):
+    """Reset Tank level"""
+
+    log("INFO", "Tank level reset from web")
+    meter.value(0)
+    nvs.set_i32("cnt", 0)
+    nvs.commit()
+    w.write(b"HTTP/1.0 200 OK\r\n\r\n")
+    await w.drain()
+
+
 @app.route('/restart', methods=['POST'])
 async def post_restart(r,w):
 

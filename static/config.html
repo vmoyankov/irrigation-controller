@@ -73,7 +73,7 @@
             text-align: center;
         }
 
-        #save-button {
+        button {
             background-color: #4a90e2;
             color: #fff;
             padding: 12px 24px;
@@ -85,11 +85,11 @@
             transition: background-color 0.3s, transform 0.1s;
         }
 
-        #save-button:hover {
+        button:hover {
             background-color: #357bd8;
         }
         
-        #save-button:active {
+        button:active {
             transform: scale(0.98);
         }
 
@@ -114,6 +114,53 @@
             border: 1px solid #f5c6cb;
         }
 
+ /* Modal specific styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1; 
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        #modal-yes-btn {
+            background-color: #ef4444; /* Red for confirmation */
+            color: white;
+        }
+        
+        #modal-no-btn {
+            background-color: #cbd5e0;
+            color: #4a5568;
+        }
     </style>
 </head>
 <body>
@@ -189,6 +236,17 @@
 
     <div class="button-container">
         <button id="save-button">Save Configuration</button>
+        <button id="tank-button">Reset Tank Level</button>
+    </div>
+</div>
+<!-- Custom Confirmation Modal -->
+<div id="confirmation-modal" class="modal">
+    <div class="modal-content">
+        <p id="modal-message">Are you sure you want to reset the tank level?</p>
+        <div class="modal-buttons">
+            <button id="modal-yes-btn">Yes</button>
+            <button id="modal-no-btn">No</button>
+        </div>
     </div>
 </div>
 
@@ -196,6 +254,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
         const statusElement = document.getElementById('status');
         const saveButton = document.getElementById('save-button');
+        const tankButton = document.getElementById('tank-button');
         const volumes = [];
         for (let i = 1; i <= 12; i++) {
             volumes.push(document.getElementById(`volume-${i}`));
@@ -208,6 +267,13 @@
             statusElement.textContent = message;
             statusElement.className = isError ? 'status-error' : 'status-success';
         };
+
+        // Modal elements
+        const modal = document.getElementById('confirmation-modal');
+        const modalMessage = document.getElementById('modal-message');
+        const modalYesBtn = document.getElementById('modal-yes-btn');
+        const modalNoBtn = document.getElementById('modal-no-btn');
+        let modalResolver;
 
         const loadConfig = async () => {
             try {
@@ -278,8 +344,60 @@
             }
         };
 
+
+        const resetTank = async (event) => {
+            const confirmed = await showConfirmDialog('Are you sure you want to reset the tank level? This cannot be undone.');
+            if (confirmed) {
+                try {
+                    showStatus('Resetting tank level...');
+                    const response = await fetch('/reset-tank', {
+                        method: 'POST',
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Server returned status: ${response.status}`);
+                    }
+                    
+                    showStatus('Tank level reset successfully.');
+
+                } catch (error) {
+                    console.error('Error resseting tank leve:', error);
+                    showStatus(`Failed to reset tank level: ${error.message}`, true);
+                }
+            }  else {
+                showStatus('Tank reset cancelled.');
+            }
+        };
+
+        // Function to show the custom confirmation dialog
+        const showConfirmDialog = (message) => {
+            modalMessage.textContent = message;
+            modal.style.display = 'flex';
+            // Return a promise that resolves when the user clicks a button
+            return new Promise(resolve => {
+                modalResolver = resolve;
+            });
+        };
+
+        // Event listener for the "Yes" button in the modal
+        modalYesBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+            if (modalResolver) {
+                modalResolver(true); // Resolve the promise with true
+            }
+        });
+
+        // Event listener for the "No" button in the modal
+        modalNoBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+            if (modalResolver) {
+                modalResolver(false); // Resolve the promise with false
+            }
+        });
+
         // Attach event listeners
         saveButton.addEventListener('click', saveConfig);
+        tankButton.addEventListener('click', resetTank);
 
         // Load configuration on page load
         loadConfig();
