@@ -8,6 +8,7 @@ import micropython
 from esp32 import NVS
 import json
 from neopixel import NeoPixel
+import machine
 
 # --- Third-party libraries ---
 # https://github.com/wybiral/micropython-aioweb
@@ -388,40 +389,38 @@ async def static(r,w):
     await serve_file(r, w, filename, mime)
 
 
+@app.route("/status")
+async def status(r,w):
+    tank = config.TANK_SIZE - meter.value() / config.PULSES_PER_LITER
+    tank = round(tank, 1)
+    hour = settings["schedule"]["hour"]
+    minute = settings["schedule"]["minute"]
+    st = {
+        "current_time": fmt_time(localtime()),
+        "state": current_state.text(),
+        "tank": tank,
+        "last_run": fmt_time(localtime(last_run)),
+        "next_run": f"{hour:02d}:{minute:02d}",
+        "last_msg": last_run_msg,
+        "log": [error_message],
+    }
+
+    await w.awrite(b"HTTP/1.0 200 OK\r\nContent-type: application/json\r\n\r\n")
+    await w.awrite(json.dumps(st).encode())
+    await w.drain()
+
+
 @app.route('/')
 async def index(r,w):
     """Main status page for the web interface."""
-    liters = meter.value() / config.PULSES_PER_LITER
-    tank = config.TANK_SIZE - liters
-    hour = settings["schedule"]["hour"]
-    minute = settings["schedule"]["minute"]
-    html = f"""
-    <!DOCTYPE html><html><head><title>Irrigation Controller</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>body{{font-family:sans-serif;}}</style></head><body>
-    <h1>Irrigation Controller</h1>
-    <p><strong>Current_time:</strong> {fmt_time(localtime())}</p>
-    <p><strong>State:</strong> {current_state.text()}</p>
-    <p>{status_message}</p>
-    <p><strong>Last Irrigation:</strong> {fmt_time(localtime(last_run))}: {last_run_msg}</p>
-    <p><strong>Water Meter:</strong> {liters:.1f}L ({meter.value()} pulses)</p>
-    <p><strong>Remainig Water in the Tank:</strong> {tank:.1f}L</p>
-    <p><strong>Last Error:</strong> {error_message or "None"}</p>
-    <p><a href="/static?config.html">Config</a></p>
-    <form action="/run" method="post">
-        <button type="submit" style="padding:10px;">Run Irrigation Cycle</button>
-        Automatic start at <strong>{hour:02d}:{minute:02d}</strong>
-    </form>
-    <form action="/stop" method="post">
-        <button type="submit" style="padding:10px;">Stop</button>
-    </form>
-    <p>Last message: <pre>{log_msg}</pre></p>
-    </body></html>
-    """
 
-    w.write(b"HTTP/1.0 200 OK\r\nRefresh: 5\r\nContent-Type: text/html\r\n\r\n")
-    w.write(html.encode("utf8"))
-    await w.drain()
+    await serve_file(r, w, "/static/main.html", b"text/html")
+
+
+@app.route('/config.html')
+async def index(r,w):
+    await serve_file(r, w, "/static/config.html", b"text/html")
+
 
 @app.route('/run', methods=['POST'])
 async def run_cycle_request(r,w):
@@ -484,6 +483,11 @@ async def post_config(r,w):
         w.write(b"HTTP/1.0 400 Bad Request\r\n\r\n")
     await w.drain()
 
+
+@app.route('/restart', methods=['POST'])
+async def post_restart(r,w):
+
+    machine.reset()
 
 # #####################################
 # --- Main Application Logic ---

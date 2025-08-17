@@ -1,0 +1,277 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Status</title>
+    <style>
+        /* Basic styling for a clean, minimal look */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #1a202c;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 1.5rem;
+        }
+        
+        h3 {
+            color: #4a5568;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        .status-item {
+            /* Fixed width for the first column for better alignment */
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 15px;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-item span:first-child {
+            font-weight: 600;
+            text-align: left;
+        }
+        
+        .status-item span:last-child {
+            color: #4a5568;
+            text-align: left;
+        }
+
+        .log-container {
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+
+        .button-group button,
+        .button-group a {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 700;
+            transition: background-color 0.3s, transform 0.1s;
+            text-decoration: none;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .button-group button {
+            background-color: #4a90e2;
+            color: #fff;
+        }
+        
+        .button-group a {
+            background-color: #cbd5e0;
+            color: #4a5568;
+        }
+        
+        .button-group button:hover {
+            background-color: #357bd8;
+        }
+
+        .button-group a:hover {
+            background-color: #a0aec0;
+        }
+        
+        .button-group button:active,
+        .button-group a:active {
+            transform: scale(0.98);
+        }
+
+        #status-message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            min-height: 20px;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Irrigation Controller</h1>
+
+    <div class="status-item">
+        <span>Current Time:</span>
+        <span id="current-time"></span>
+    </div>
+    <div class="status-item">
+        <span>State:</span>
+        <span id="state"></span>
+    </div>
+    <div class="status-item">
+        <span>Tank Level:</span>
+        <span id="tank"></span>
+    </div>
+    <div class="status-item">
+        <span>Next Irrigation at:</span>
+        <span id="next-run"></span>
+    </div>
+    <div class="status-item">
+        <span>Last Run at:</span>
+        <span id="last-run"></span>
+    </div>
+    <div class="status-item">
+        <span>Last Message:</span>
+        <span id="last-msg"></span>
+    </div>
+
+    <h3>Log</h3>
+    <div id="log-container" class="log-container"></div>
+
+    <div class="button-group">
+        <a href="/config.html" id="config-button">Config</a>
+        <button id="start-now-button">Start Now</button>
+        <button id="stop-button">Stop</button>
+    </div>
+    <p id="status-message"></p>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const currentTimeElement = document.getElementById('current-time');
+        const stateElement = document.getElementById('state');
+        const tankElement = document.getElementById('tank');
+        const nextRunElement = document.getElementById('next-run');
+        const lastRunElement = document.getElementById('last-run');
+        const lastMsgElement = document.getElementById('last-msg');
+        const logContainer = document.getElementById('log-container');
+        const startButton = document.getElementById('start-now-button');
+        const stopButton = document.getElementById('stop-button');
+        const statusMessageElement = document.getElementById('status-message');
+        
+        const showStatus = (message, isError = false) => {
+            statusMessageElement.textContent = message;
+            statusMessageElement.className = isError ? 'status-error' : 'status-success';
+        };
+
+        const fetchStatus = async () => {
+            try {
+                const response = await fetch('/status', { method: 'GET' });
+                if (!response.ok) {
+                    throw new Error(`Server returned status: ${response.status}`);
+                }
+                const status = await response.json();
+                
+                // Update the status fields
+                currentTimeElement.textContent = status.current_time || 'N/A';
+                stateElement.textContent = status.state || 'N/A';
+                tankElement.textContent = (status.tank !== null && status.tank !== undefined) ? `${status.tank}L` : 'N/A';
+                nextRunElement.textContent = status.next_run || 'N/A';
+                lastRunElement.textContent = status.last_run || 'N/A';
+                lastMsgElement.textContent = status.last_msg || 'N/A';
+                
+                // Clear and populate the log
+                logContainer.innerHTML = '';
+                if (status.log && Array.isArray(status.log)) {
+                    status.log.forEach(message => {
+                        const p = document.createElement('p');
+                        p.textContent = message;
+                        logContainer.appendChild(p);
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching status:', error);
+                // showStatus(`Failed to connect to device.`, true); // Commented out to avoid constant error messages
+            }
+        };
+
+        const sendCommand = async (endpoint) => {
+            try {
+                showStatus(`Sending command to ${endpoint}...`);
+                const button = (endpoint === '/run') ? startButton : stopButton;
+                button.disabled = true;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned status: ${response.status}`);
+                }
+                
+                showStatus(`Command sent successfully to ${endpoint}.`);
+            } catch (error) {
+                console.error('Error sending command:', error);
+                showStatus(`Failed to send command to ${endpoint}: ${error.message}`, true);
+            } finally {
+                startButton.disabled = false;
+                stopButton.disabled = false;
+            }
+        };
+
+        // Attach button event listeners
+        startButton.addEventListener('click', () => sendCommand('/run'));
+        stopButton.addEventListener('click', () => sendCommand('/stop'));
+
+        // Fetch status immediately and then every 3 seconds
+        fetchStatus();
+        setInterval(fetchStatus, 3000);
+    });
+</script>
+
+</body>
+</html>
