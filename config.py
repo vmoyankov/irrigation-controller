@@ -48,4 +48,5 @@ DEFAULT_SETTINGS = {
         "hour": 21,
         "minute": 30,
     },
+    "autorun": True,
 }

@@ -312,7 +312,7 @@ async def scheduler():
         lt = localtime(now)
 
         try:
-            if should_run(hour, minute):
+            if settings.get("autorun", True) and should_run(hour, minute):
                 log("INFO", "Scheduler: ready to run taks")
                 if current_state.get() == State.IDLE:
                     program = dict(enumerate(settings["volumes"], start=1))
@@ -406,7 +406,7 @@ async def status(r,w):
         "state": current_state.text(),
         "tank": tank,
         "last_run": fmt_time(localtime(last_run)),
-        "next_run": f"{hour:02d}:{minute:02d}",
+        "next_run": f"{hour:02d}:{minute:02d}" if settings.get("autorun", True) else "Disabled",
         "last_msg": last_run_msg,
         "log": [error_message],
     }
@@ -426,6 +426,11 @@ async def index(r,w):
 @app.route('/config.html')
 async def index(r,w):
     await serve_file(r, w, "/static/config.html", b"text/html")
+
+@app.route('/min.css')
+async def index(r,w):
+    await serve_file(r, w, "/static/min.css", b"text/css")
+
 
 
 @app.route('/run', methods=['POST'])

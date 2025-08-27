@@ -4,175 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Configuration</title>
-    <style>
-        /* Basic styling for a clean, minimal look */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f4f8;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 600px;
-            box-sizing: border-box;
-        }
-
-        h1 {
-            color: #1a202c;
-            text-align: center;
-            margin-bottom: 25px;
-            font-size: 1.5rem;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .form-group input[type="number"],
-        .form-group input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            box-sizing: border-box;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input[type="number"]:focus,
-        .form-group input[type="text"]:focus {
-            border-color: #4a90e2;
-            outline: none;
-        }
-
-        .volume-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .button-container {
-            text-align: center;
-        }
-
-        button {
-            background-color: #4a90e2;
-            color: #fff;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 700;
-            transition: background-color 0.3s, transform 0.1s;
-            margin: 5px;
-        }
-
-        #tank-button {
-            background-color: #ff0d6c;
-        }
-
-        button:hover {
-            background-color: #357bd8;
-        }
-        
-        button:active {
-            transform: scale(0.98);
-        }
-
-        #status {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: 600;
-            min-height: 20px;
-        }
-
-        .status-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .status-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
- /* Modal specific styles */
-        .modal {
-            display: none; /* Hidden by default */
-            position: fixed;
-            z-index: 1; 
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.4);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            padding: 25px;
-            border-radius: 12px;
-            text-align: center;
-            max-width: 400px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        .modal-buttons {
-            margin-top: 20px;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
-        
-        .modal-buttons button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: 700;
-        }
-
-        #modal-yes-btn {
-            background-color: #ef4444; /* Red for confirmation */
-            color: white;
-        }
-        
-        #modal-no-btn {
-            background-color: #cbd5e0;
-            color: #4a5568;
-        }
-    </style>
+    <link rel="stylesheet" href="min.css">
 </head>
 <body>
 
 <div class="container">
     <h1>Device Configuration</h1>
     <p id="status"></p>
+</div>
 
     <div class="form-group">
         <label for="pump-power">Pump Power (%)</label>
@@ -180,68 +19,81 @@
     </div>
 
     <div class="form-group">
+          <label for="autorun">Automatic Irrigation</label>
+          <input type="checkbox" id="autorun"/>
+    </div>
+
+    <div class="form-group" id="schedule-group">
         <label>Schedule (HH:MM)</label>
-        <div style="display: flex; gap: 10px;">
+        <div class="row">
+          <div class="col">
             <input type="number" id="schedule-hour" min="0" max="23" placeholder="Hour (0-23)" style="flex: 1;" />
+          </div>
+          <div class="col">
             <input type="number" id="schedule-minute" min="0" max="59" placeholder="Minute (0-59)" style="flex: 1;" />
+          </div>
         </div>
     </div>
 
     <h3>Volumes (ml)</h3>
-    <div class="volume-grid">
-        <div class="form-group" style="margin-bottom: 0;">
+    <div class="row">
+        <div class="col" >
             <label for="volume-1">Valve 1</label>
             <input type="number" id="volume-1" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-2">Valve 2</label>
             <input type="number" id="volume-2" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-3">Valve 3</label>
             <input type="number" id="volume-3" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-4">Valve 4</label>
             <input type="number" id="volume-4" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-5">Valve 5</label>
             <input type="number" id="volume-5" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-6">Valve 6</label>
             <input type="number" id="volume-6" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-7">Valve 7</label>
             <input type="number" id="volume-7" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-8">Valve 8</label>
             <input type="number" id="volume-8" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-9">Valve 9</label>
             <input type="number" id="volume-9" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-10">Valve 10</label>
             <input type="number" id="volume-10" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-11">Valve 11</label>
             <input type="number" id="volume-11" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="col" >
             <label for="volume-12">Valve 12</label>
             <input type="number" id="volume-12" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
     </div>
 
-    <div class="button-container">
-        <button id="save-button">Save Configuration</button>
-        <button id="tank-button">Reset Tank Level</button>
+    <div class="row">
+        <div class="col">
+          <button class="btn-green" id="save-button">Save Configuration</button>
+        </div>
+        <div class="col">
+          <button class="btn-blue" id="tank-button">Reset Tank Level</button>
+        </div>
     </div>
 </div>
 <!-- Custom Confirmation Modal -->
@@ -249,7 +101,7 @@
     <div class="modal-content">
         <p id="modal-message">Are you sure you want to reset the tank level?</p>
         <div class="modal-buttons">
-            <button id="modal-yes-btn">Yes</button>
+            <button class="btn-red" id="modal-yes-btn">Yes</button>
             <button id="modal-no-btn">No</button>
         </div>
     </div>
@@ -265,12 +117,23 @@
             volumes.push(document.getElementById(`volume-${i}`));
         }
         const pumpPowerInput = document.getElementById('pump-power');
+        const autorunInput = document.getElementById('autorun');
+        const scheduleGroup = document.getElementById('schedule-group');
         const scheduleHourInput = document.getElementById('schedule-hour');
         const scheduleMinuteInput = document.getElementById('schedule-minute');
         
         const showStatus = (message, isError = false) => {
             statusElement.textContent = message;
             statusElement.className = isError ? 'status-error' : 'status-success';
+        };
+
+        const updateScheduleDisabled = () => {
+            const disabled = !autorunInput.checked;
+            scheduleHourInput.disabled = disabled;
+            scheduleMinuteInput.disabled = disabled;
+            if (scheduleGroup) {
+                scheduleGroup.style.opacity = disabled ? '0.3' : '';
+            }
         };
 
         // Modal elements
@@ -296,8 +159,11 @@
                 });
                 
                 pumpPowerInput.value = config.pumpPower;
+                autorunInput.checked = config.autorun;
                 scheduleHourInput.value = config.schedule.hour;
                 scheduleMinuteInput.value = config.schedule.minute;
+
+                updateScheduleDisabled();
 
                 showStatus('Configuration loaded successfully.');
 
@@ -321,7 +187,8 @@
                 schedule: {
                     hour: parseInt(scheduleHourInput.value),
                     minute: parseInt(scheduleMinuteInput.value)
-                }
+                },
+                autorun: autorunInput.checked
             };
             
             try {
@@ -403,9 +270,11 @@
         // Attach event listeners
         saveButton.addEventListener('click', saveConfig);
         tankButton.addEventListener('click', resetTank);
+        autorunInput.addEventListener('change', updateScheduleDisabled);
 
         // Load configuration on page load
         loadConfig();
+        updateScheduleDisabled();
     });
 </script>
 
