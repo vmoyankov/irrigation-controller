@@ -5,148 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Status</title>
+    <link rel="stylesheet" href="min.css">
     <style>
-        /* Basic styling for a clean, minimal look */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f4f8;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 600px;
-            box-sizing: border-box;
-        }
-
-        h1 {
-            color: #1a202c;
-            text-align: center;
-            margin-bottom: 25px;
-            font-size: 1.5rem;
-        }
-        
-        h3 {
-            color: #4a5568;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 8px;
-            margin-top: 25px;
-            margin-bottom: 15px;
-        }
-
-        .status-item {
-            /* Fixed width for the first column for better alignment */
-            display: grid;
-            grid-template-columns: 150px 1fr;
-            gap: 15px;
-            align-items: center;
-            padding: 10px 0;
+        .line {
             border-bottom: 1px dashed #e2e8f0;
         }
-        
-        .status-item:last-child {
-            border-bottom: none;
-        }
-
-        .status-item span:first-child {
-            font-weight: 600;
-            text-align: left;
-        }
-        
-        .status-item span:last-child {
-            color: #4a5568;
-            text-align: left;
-        }
-
-        .log-container {
-            background-color: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 10px;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            font-family: monospace;
-            font-size: 0.8rem;
-        }
-
-        .button-group {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 25px;
-            flex-wrap: wrap;
-        }
-
-        .button-group button,
-        .button-group a {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 700;
-            transition: background-color 0.3s, transform 0.1s;
-            text-decoration: none;
-            text-align: center;
-            display: inline-block;
-        }
-
-        .button-group button {
-            background-color: #4a90e2;
-            color: #fff;
-        }
-        
-        .button-group a {
-            background-color: #cbd5e0;
-            color: #4a5568;
-        }
-        
-        .button-group button:hover {
-            background-color: #357bd8;
-        }
-
-        .button-group a:hover {
-            background-color: #a0aec0;
-        }
-        
-        .button-group button:active,
-        .button-group a:active {
-            transform: scale(0.98);
-        }
-
-        #status-message {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: 600;
-            min-height: 20px;
-        }
-
-        .status-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .status-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
     </style>
 </head>
 <body>
@@ -154,38 +17,43 @@
 <div class="container">
     <h1>Irrigation Controller</h1>
 
-    <div class="status-item">
-        <span>Current Time:</span>
-        <span id="current-time"></span>
+    <div class="row line">
+        <label class="col">Current Time:</label>
+        <div class="col2" id="current-time"></div>
     </div>
-    <div class="status-item">
-        <span>State:</span>
-        <span id="state"></span>
+    <div class="row line">
+        <label class="col">State:</label>
+        <div class="col2" id="state"></div>
     </div>
-    <div class="status-item">
-        <span>Tank Level:</span>
-        <span id="tank"></span>
+    <div class="row line">
+        <label class="col">Tank Level:</label>
+        <div class="col2" id="tank"></div>
     </div>
-    <div class="status-item">
-        <span>Next Irrigation at:</span>
-        <span id="next-run"></span>
+    <div class="row line">
+        <label class="col">Next Irrigation at:</label>
+        <div class="col2" id="next-run"></div>
     </div>
-    <div class="status-item">
-        <span>Last Run at:</span>
-        <span id="last-run"></span>
+    <div class="row line">
+        <label class="col">Last Run at:</label>
+        <div class="col2" id="last-run"></div>
     </div>
-    <div class="status-item">
-        <span>Last Message:</span>
-        <span id="last-msg"></span>
+    <div class="row">
+        <label class="col">Last Message:</label>
+    </div>
+    <div class="row line">
+        <div class="col2" id="last-msg"></div>
     </div>
 
-    <h3>Log</h3>
-    <div id="log-container" class="log-container"></div>
-
-    <div class="button-group">
-        <a href="/config.html" id="config-button">Config</a>
-        <button id="start-now-button">Start Now</button>
-        <button id="stop-button">Stop</button>
+    <div class="row">
+        <div class="col">
+          <button id="config-button" onclick="window.location.href='config.html'">Config</button>
+        </div>
+        <div class="col">
+          <button id="start-now-button">Start Now</button>
+        </div>
+        <div class="col">
+          <button id="stop-button">Stop</button>
+        </div>
     </div>
     <p id="status-message"></p>
 </div>

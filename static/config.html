@@ -5,34 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Configuration</title>
     <link rel="stylesheet" href="min.css">
+    <style>
+        .hr-box {
+            width: 4rem;
+            padding-left: 0.5rem;
+            padding-right: 0.25rem;
+        }
+    </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Device Configuration</h1>
     <p id="status"></p>
-</div>
 
-    <div class="form-group">
-        <label for="pump-power">Pump Power (%)</label>
-        <input type="number" id="pump-power" min="0" max="100" placeholder="0 - 100" />
-    </div>
-
-    <div class="form-group">
-          <label for="autorun">Automatic Irrigation</label>
-          <input type="checkbox" id="autorun"/>
-    </div>
-
-    <div class="form-group" id="schedule-group">
-        <label>Schedule (HH:MM)</label>
-        <div class="row">
-          <div class="col">
-            <input type="number" id="schedule-hour" min="0" max="23" placeholder="Hour (0-23)" style="flex: 1;" />
-          </div>
-          <div class="col">
-            <input type="number" id="schedule-minute" min="0" max="59" placeholder="Minute (0-59)" style="flex: 1;" />
-          </div>
+    <div class="row">
+        <div class="col">
+            <label for="pump-power">Pump Power (%)</label>
         </div>
+        <div class="col">
+            <input type="number" id="pump-power" min="0" max="100" placeholder="0 - 100" />
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col">
+          <label for="autorun">Automatic Irrigation</label>
+        </div>
+        <div class="col">
+          <input type="checkbox" id="autorun"/>
+          </div>
+    </div>
+
+    <div class="row" id="schedule-group">
+        <div class="col">
+            <label>Schedule (HH:MM)</label>
+        </div>
+        <div class="col">
+            <input type="number" class="hr-box" id="schedule-hour" min="0" max="23" placeholder="0-23"/> : 
+            <input type="number" class="hr-box" id="schedule-minute" min="0" max="59" placeholder="0-59"/>
+          </div>
     </div>
 
     <h3>Volumes (ml)</h3>
@@ -92,6 +104,9 @@
           <button class="btn-green" id="save-button">Save Configuration</button>
         </div>
         <div class="col">
+          <button id="cancel-button" onclick="window.history.back()">Cancel</button>
+        </div>
+       <div class="col">
           <button class="btn-blue" id="tank-button">Reset Tank Level</button>
         </div>
     </div>
