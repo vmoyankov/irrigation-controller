@@ -1,9 +1,10 @@
-# https://github.com/wybiral/micropython-aioweb
+# Based on https://github.com/wybiral/micropython-aioweb
 
 import uasyncio as asyncio
 from hashlib import sha1
 from binascii import b2a_base64
 import struct
+import time
 
 def unquote_plus(s):
     out = []
@@ -43,6 +44,27 @@ def parse_qs(s):
                 out[key] = [tmp, val]
     return out
 
+def get_mime_type(filename):
+    ext = filename.lower().split('.')[-1] if '.' in filename else ''
+    mime_types = {
+        'html': 'text/html', 'htm': 'text/html', 'css': 'text/css',
+        'js': 'application/javascript', 'json': 'application/json',
+        'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+        'gif': 'image/gif', 'ico': 'image/x-icon', 'svg': 'image/svg+xml',
+        'txt': 'text/plain', 'pdf': 'application/pdf', 'xml': 'application/xml',
+        'zip': 'application/zip', 'woff': 'font/woff', 'woff2': 'font/woff2',
+        'ttf': 'font/ttf', 'eot': 'application/vnd.ms-fontobject'
+    }
+    return mime_types.get(ext, 'application/octet-stream')
+
+def path_matches_pattern(path, pattern):
+    if pattern == '/':
+        return path == '/'
+    if pattern.endswith('/'):
+        return path.startswith(pattern[:-1])
+    return path == pattern
+
+
 async def _parse_request(r, w):
     line = await r.readline()
     if not line:
@@ -80,6 +102,7 @@ class App:
         self.host = host
         self.port = port
         self.handlers = []
+        self.buffer = bytearray(1024)
 
     def route(self, path, methods=['GET']):
         def wrapper(handler):
@@ -87,22 +110,56 @@ class App:
             return handler
         return wrapper
 
+    def static(self, url_path, directory):
+        def static_handler(request, writer):
+            return self._serve_static_file(request, writer, url_path, directory)
+        self.handlers.append((url_path, ['GET'], static_handler))
+
+    async def _serve_static_file(self, request, writer, url_path, directory):
+        try:
+            file_path = request.path[len(url_path):]
+            
+            while file_path.startswith('/'):
+                file_path = file_path[1:]
+            
+            full_path = directory + '/' + file_path if directory else file_path
+            if full_path.endswith('/'):
+                full_path = full_path[:-1]
+            if '..' in file_path or file_path.startswith('/'):
+                await writer.awrite(b'HTTP/1.0 403 Forbidden\r\n\r\nForbidden')
+                return
+            
+            try:
+                with open(full_path, 'rb') as f:
+                    mime_type = get_mime_type(full_path)
+                    cache_headers = 'Cache-Control: public, max-age=31536000\r\n'
+                    await writer.awrite(f'HTTP/1.0 200 OK\r\nContent-Type: {mime_type}\r\n{cache_headers}\r\n'.encode())
+                    
+                    while True:
+                        n = f.readinto(self.buffer)
+                        if n == 0:
+                            break
+                        await writer.awrite(self.buffer[:n])
+                        
+            except OSError:
+                await writer.awrite(b'HTTP/1.0 404 Not Found\r\n\r\nFile Not Found')
+                return
+            
+        except:
+            await writer.awrite(b'HTTP/1.0 500 Internal Server Error\r\n\r\nInternal Server Error')
+
     async def _dispatch(self, r, w):
         try:
             await _parse_request(r, w)
-        except:
+            for path, methods, handler in self.handlers:
+                if path_matches_pattern(r.path, path) and r.method in methods:
+                    await handler(r, w)
+                    return
+            await w.awrite(b'HTTP/1.0 404 Not Found\r\n\r\nNot Found')
+        except Exception as e:
+            print(e)
+        finally:
             await w.wait_closed()
-            return
-        for path, methods, handler in self.handlers:
-            if r.path != path:
-                continue
-            if r.method not in methods:
-                continue
-            await handler(r, w)
-            await w.wait_closed()
-            return
-        await w.awrite(b'HTTP/1.0 404 Not Found\r\n\r\nNot Found')
-        await w.wait_closed()
 
     async def serve(self):
         await asyncio.start_server(self._dispatch, self.host, self.port)
