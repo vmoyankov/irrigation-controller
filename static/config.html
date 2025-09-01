@@ -19,7 +19,7 @@
 <div class="container">
     <h1>Device Configuration</h1>
 
-    <div id="settings-group">
+    <div id="settings-group" style="display: none;">
     <div class="row">
         <div class="col">
             <label for="pumpPower">Pump Power (%)</label>
@@ -119,6 +119,7 @@
 
 <script>
     fetch('/config').then(r=>r.json()).then(d=>jsonToForm(d))
+    .then(()=>document.getElementById('settings-group').style.display = 'block')
     .then(()=>toggleAutorun());
 
     function saveConfig() {
