@@ -13,7 +13,7 @@ import utils
 app = web.App(host='0.0.0.0', port=config.WEB_SERVER_PORT)
 
 
-app.static("/static", "/static")
+app.static("/static/", "/static")
 app.static("/", "/static/index.html")
 
 @app.route("/status")
@@ -23,12 +23,12 @@ async def status(r, w):
     hour = logic.settings["schedule"]["hour"]
     minute = logic.settings["schedule"]["minute"]
     st = {
-        "current_time": utils.fmt_time(localtime()),
+        "current-time": utils.fmt_time(localtime()),
         "state": logic.current_state.text(),
         "tank": tank,
-        "last_run": utils.fmt_time(localtime(logic.last_run)),
-        "next_run": f"{hour:02d}:{minute:02d}" if logic.settings.get("autorun", True) else "Disabled",
-        "last_msg": logic.last_run_msg,
+        "last-run": utils.fmt_time(localtime(logic.last_run)),
+        "next-run": f"{hour:02d}:{minute:02d}" if logic.settings.get("autorun", True) else "Disabled",
+        "last-msg": logic.last_run_msg,
         "log": [logic.error_message],
     }
     await w.awrite(b"HTTP/1.0 200 OK\r\nContent-type: application/json\r\n\r\n")
@@ -39,24 +39,22 @@ async def status(r, w):
 async def run_cycle_request(r, w):
     utils.log("INFO", "Run cycle triggered via web interface.")
     if logic.start_cycle_task():
-        msg, code = "Cycle started", 200
+        msg, code = "<div class='status-success'>Cycle started</div>", 200
     else:
-        msg, code = "System is not idle, cannot start cycle.", 409
+        msg, code = "<div class='status-error'>System is not idle, cannot start cycle.</div>", 409
     await w.awrite(f"HTTP/1.0 {code} OK\r\nRefresh: 3;url=/\r\nContent-Type: text/html\r\n\r\n".encode("utf8"))
-    html = f"""<html><head></head><body><h1>{msg}</h1></body></html>"""
-    await w.awrite(html.encode("utf8"))
+    await w.awrite(msg.encode("utf8"))
 
 
 @app.route('/stop', methods=['POST'])
 async def stop_cycle_request(r, w):
     utils.log("INFO", "Stop current cycle via web interface.")
     if logic.stop_cycle_task():
-        msg, code = "Cycle canceled", 200
+        msg, code = "<div class='status-success'>Cycle canceled</div>", 200
     else:
-        msg, code = "No task active", 409
+        msg, code = "<div class='status-error'>No active cycle</div>", 409
     await w.awrite(f"HTTP/1.0 {code} OK\r\nRefresh: 3;url=/\r\nContent-Type: text/html\r\n\r\n".encode("utf8"))
-    html = f"""<html><head></head><body><h1>{msg}</h1></body></html>"""
-    await w.awrite(html.encode("utf8"))
+    await w.awrite(msg.encode("utf8"))
 
 
 @app.route('/config', methods=['GET'])

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Configuration</title>
-    <link rel="stylesheet" href="min.css">
+    <link rel="stylesheet" href="/static/min.css">
     <style>
         .hr-box {
             width: 4rem;
@@ -12,18 +12,20 @@
             padding-right: 0.25rem;
         }
     </style>
+    <script src="/static/form-to-json.js"></script>
 </head>
 <body>
 
 <div class="container">
     <h1>Device Configuration</h1>
 
+    <div id="settings-group">
     <div class="row">
         <div class="col">
-            <label for="pump-power">Pump Power (%)</label>
+            <label for="pumpPower">Pump Power (%)</label>
         </div>
         <div class="col">
-            <input type="number" id="pump-power" min="0" max="100" placeholder="0 - 100" />
+            <input type="number" id="pumpPower" min="0" max="100" placeholder="0 - 100" />
         </div>
     </div>
 
@@ -32,267 +34,121 @@
           <label for="autorun">Automatic Irrigation</label>
         </div>
         <div class="col">
-          <input type="checkbox" id="autorun"/>
-          </div>
+          <input type="checkbox" id="autorun" onchange="toggleAutorun()"/>
+        </div>
     </div>
 
-    <div class="row" id="schedule-group">
+    <div class="row" id="schedule-group" style="display: none;">
         <div class="col">
             <label>Schedule (HH:MM)</label>
         </div>
         <div class="col">
-            <input type="number" class="hr-box" id="schedule-hour" min="0" max="23" placeholder="0-23"/> : 
-            <input type="number" class="hr-box" id="schedule-minute" min="0" max="59" placeholder="0-59"/>
+            <input type="number" class="hr-box" id="schedule.hour" min="0" max="23" placeholder="0-23"/> : 
+            <input type="number" class="hr-box" id="schedule.minute" min="0" max="59" placeholder="0-59"/>
           </div>
     </div>
 
     <h3>Volumes (ml)</h3>
     <div class="row">
         <div class="col" >
-            <label for="volume-1">Valve 1</label>
-            <input type="number" id="volume-1" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.1">Valve 1</label>
+            <input type="number" id="volumes.1" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-2">Valve 2</label>
-            <input type="number" id="volume-2" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.2">Valve 2</label>
+            <input type="number" id="volumes.2" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-3">Valve 3</label>
-            <input type="number" id="volume-3" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.3">Valve 3</label>
+            <input type="number" id="volumes.3" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-4">Valve 4</label>
-            <input type="number" id="volume-4" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.4">Valve 4</label>
+            <input type="number" id="volumes.4" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-5">Valve 5</label>
-            <input type="number" id="volume-5" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.5">Valve 5</label>
+            <input type="number" id="volumes.5" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-6">Valve 6</label>
-            <input type="number" id="volume-6" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.6">Valve 6</label>
+            <input type="number" id="volumes.6" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-7">Valve 7</label>
-            <input type="number" id="volume-7" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.7">Valve 7</label>
+            <input type="number" id="volumes.7" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-8">Valve 8</label>
-            <input type="number" id="volume-8" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.8">Valve 8</label>
+            <input type="number" id="volumes.8" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-9">Valve 9</label>
-            <input type="number" id="volume-9" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.9">Valve 9</label>
+            <input type="number" id="volumes.9" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-10">Valve 10</label>
-            <input type="number" id="volume-10" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.10">Valve 10</label>
+            <input type="number" id="volumes.10" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-11">Valve 11</label>
-            <input type="number" id="volume-11" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.11">Valve 11</label>
+            <input type="number" id="volumes.11" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
         <div class="col" >
-            <label for="volume-12">Valve 12</label>
-            <input type="number" id="volume-12" class="volume-input" min="10" max="2000" placeholder="" />
+            <label for="volumes.12">Valve 12</label>
+            <input type="number" id="volumes.12" class="volume-input" min="10" max="2000" placeholder="" />
         </div>
+    </div>
     </div>
 
     <div class="row">
         <div class="col">
-          <button class="btn-green" id="save-button">Save Configuration</button>
+          <button type="button" class="btn-green" id="save-button" onclick="saveConfig()">Save Configuration</button>
         </div>
         <div class="col">
-          <button id="cancel-button" onclick="window.history.back()">Cancel</button>
+          <button type="button" id="cancel-button" onclick="window.history.back()">Cancel</button>
         </div>
        <div class="col">
-          <button class="btn-blue" id="tank-button">Reset Tank Level</button>
+          <button type="button" class="btn-blue" id="tank-button" onclick="resetTank()">Reset Tank Level</button>
         </div>
     </div>
     <div class="row">
         <p id="status"></p>
     </div>
 </div>
-<!-- Custom Confirmation Modal -->
-<div id="confirmation-modal" class="modal">
-    <div class="modal-content">
-        <p id="modal-message">Are you sure you want to reset the tank level?</p>
-        <div class="modal-buttons">
-            <button class="btn-red" id="modal-yes-btn">Yes</button>
-            <button id="modal-no-btn">No</button>
-        </div>
-    </div>
-</div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-        const statusElement = document.getElementById('status');
-        const saveButton = document.getElementById('save-button');
-        const tankButton = document.getElementById('tank-button');
-        const volumes = [];
-        for (let i = 1; i <= 12; i++) {
-            volumes.push(document.getElementById(`volume-${i}`));
-        }
-        const pumpPowerInput = document.getElementById('pump-power');
-        const autorunInput = document.getElementById('autorun');
+    fetch('/config').then(r=>r.json()).then(d=>jsonToForm(d))
+    .then(()=>toggleAutorun());
+
+    function saveConfig() {
+        console.log('Saving configuration');
+        const data = formToJson('settings-group');
+        fetch('/config', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        window.location.href = "/";
+    }
+
+    function resetTank() {
+        if (!confirm('Are you sure you want to reset the tank level? This can not be undone.')) return;
+        fetch('/reset-tank', {
+            method: 'POST',
+        });
+        alert('Tank level was reset');
+        window.location.href = "/";
+    }
+
+    function toggleAutorun() {
+        const autorun = document.getElementById('autorun');
         const scheduleGroup = document.getElementById('schedule-group');
-        const scheduleHourInput = document.getElementById('schedule-hour');
-        const scheduleMinuteInput = document.getElementById('schedule-minute');
-        
-        const showStatus = (message, isError = false) => {
-            statusElement.textContent = message;
-            statusElement.className = isError ? 'status-error' : 'status-success';
-        };
-
-        const updateScheduleDisabled = () => {
-            const disabled = !autorunInput.checked;
-            scheduleHourInput.disabled = disabled;
-            scheduleMinuteInput.disabled = disabled;
-            if (scheduleGroup) {
-                scheduleGroup.style.opacity = disabled ? '0.3' : '';
-            }
-        };
-
-        // Modal elements
-        const modal = document.getElementById('confirmation-modal');
-        const modalMessage = document.getElementById('modal-message');
-        const modalYesBtn = document.getElementById('modal-yes-btn');
-        const modalNoBtn = document.getElementById('modal-no-btn');
-        let modalResolver;
-
-        const loadConfig = async () => {
-            try {
-                showStatus('Loading configuration...');
-                const response = await fetch('/config', { method: 'GET' });
-                if (!response.ok) {
-                    throw new Error(`Server returned status: ${response.status}`);
-                }
-                const config = await response.json();
-                
-                // Populate the form fields with the loaded values
-                volumes.forEach((input, index) => {
-                    const volumeValue = config.volumes[index];
-                    input.value = (volumeValue === null || volumeValue === undefined) ? '' : volumeValue;
-                });
-                
-                pumpPowerInput.value = config.pumpPower;
-                autorunInput.checked = config.autorun;
-                scheduleHourInput.value = config.schedule.hour;
-                scheduleMinuteInput.value = config.schedule.minute;
-
-                updateScheduleDisabled();
-
-                showStatus('Configuration loaded successfully.');
-
-            } catch (error) {
-                console.error('Error loading configuration:', error);
-                showStatus(`Failed to load configuration: ${error.message}`, true);
-            }
-        };
-
-        const saveConfig = async (event) => {
-            event.preventDefault();
-            
-            // Collect all form data
-            const configData = {
-                volumes: volumes.map(input => {
-                    const value = parseInt(input.value);
-                    // Return null if the field is empty, otherwise return the parsed integer
-                    return isNaN(value) ? null : value;
-                }),
-                pumpPower: parseInt(pumpPowerInput.value),
-                schedule: {
-                    hour: parseInt(scheduleHourInput.value),
-                    minute: parseInt(scheduleMinuteInput.value)
-                },
-                autorun: autorunInput.checked
-            };
-            
-            try {
-                showStatus('Saving configuration...');
-                saveButton.disabled = true; // Disable button to prevent multiple submissions
-                const response = await fetch('/config', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(configData),
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Server returned status: ${response.status}`);
-                }
-                
-                showStatus('Configuration saved successfully.');
-
-            } catch (error) {
-                console.error('Error saving configuration:', error);
-                showStatus(`Failed to save configuration: ${error.message}`, true);
-            } finally {
-                saveButton.disabled = false; // Re-enable the button
-            }
-        };
-
-
-        const resetTank = async (event) => {
-            const confirmed = await showConfirmDialog('Are you sure you want to reset the tank level? This cannot be undone.');
-            if (confirmed) {
-                try {
-                    showStatus('Resetting tank level...');
-                    const response = await fetch('/reset-tank', {
-                        method: 'POST',
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Server returned status: ${response.status}`);
-                    }
-                    
-                    showStatus('Tank level reset successfully.');
-
-                } catch (error) {
-                    console.error('Error resseting tank leve:', error);
-                    showStatus(`Failed to reset tank level: ${error.message}`, true);
-                }
-            }  else {
-                showStatus('Tank reset cancelled.');
-            }
-        };
-
-        // Function to show the custom confirmation dialog
-        const showConfirmDialog = (message) => {
-            modalMessage.textContent = message;
-            modal.style.display = 'flex';
-            // Return a promise that resolves when the user clicks a button
-            return new Promise(resolve => {
-                modalResolver = resolve;
-            });
-        };
-
-        // Event listener for the "Yes" button in the modal
-        modalYesBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-            if (modalResolver) {
-                modalResolver(true); // Resolve the promise with true
-            }
-        });
-
-        // Event listener for the "No" button in the modal
-        modalNoBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-            if (modalResolver) {
-                modalResolver(false); // Resolve the promise with false
-            }
-        });
-
-        // Attach event listeners
-        saveButton.addEventListener('click', saveConfig);
-        tankButton.addEventListener('click', resetTank);
-        autorunInput.addEventListener('change', updateScheduleDisabled);
-
-        // Load configuration on page load
-        loadConfig();
-        updateScheduleDisabled();
-    });
+        if (autorun.checked) {
+            scheduleGroup.style.display = 'flex';
+        } else {
+            scheduleGroup.style.display = 'none';
+        }
+    }
 </script>
 
 </body>

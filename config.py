@@ -29,20 +29,20 @@ TANK_SIZE = 85              # Liters
 # --- Web Server Configuration ---
 WEB_SERVER_PORT = 80
 DEFAULT_SETTINGS = {
-    "volumes": [
-        750,  # 1
-        800,  # 2
-        1000, # 3
-        650,  # 4
-        300,  # 5
-        900,  # 6
-        300,  # 7
-        550,  # 8
-        None, # 9
-        None, # 10
-        None, # 11
-        None, # 12
-    ],
+    "volumes": {
+        1: 750,  # 1
+        2: 800,  # 2
+        3: 1000, # 3
+        4: 650,  # 4
+        5: 300,  # 5
+        6: 900,  # 6
+        7: 300,  # 7
+        8: 550,  # 8
+        9: None, # 9
+        10: None, # 10
+        11: None, # 11
+        12: None, # 12
+    },
     "pumpPower": 30,
     "schedule": {
         "hour": 21,

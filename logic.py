@@ -1,13 +1,11 @@
 import sys
 import uasyncio as asyncio
 import time
-import network
 from machine import Pin, PWM, WDT
 import micropython
 from esp32 import NVS
 import json
 from neopixel import NeoPixel
-import machine
 
 # --- Third-party libraries ---
 from tz import localtime, mktime
@@ -181,7 +179,10 @@ def save_settings():
 
 def validate_settings(s):
     try:
-        for v in s["volumes"]:
+        for k, v in s["volumes"].items():
+            k = int(k)
+            if k < 1 or k > 12:
+                return False
             if v is None or v == 0:
                 continue
             if v < 50 or v > 3000:
@@ -290,6 +291,7 @@ async def run_cycle(program):
     start_time = time.ticks_ms()
     try:
         for v, ml in sorted(program.items()):
+            v = int(v)
             await valve_ml(v, ml)
 
         end_cnt = meter.value()
@@ -353,7 +355,7 @@ async def scheduler():
             if settings.get("autorun", True) and should_run(hour, minute):
                 log("INFO", "Scheduler: ready to run taks")
                 if current_state.get() == State.IDLE:
-                    program = dict(enumerate(settings["volumes"], start=1))
+                    program = settings["volumes"]
                     task_cycle = asyncio.create_task(run_cycle(program))
                     log("INFO", f"Scheduler: task started at {fmt_time(lt)}")
                 else:
@@ -366,7 +368,7 @@ async def scheduler():
 def start_cycle_task():
     global task_cycle
     if current_state.get() == State.IDLE:
-        program = dict(enumerate(settings["volumes"], start=1))
+        program = settings["volumes"]
         task_cycle = asyncio.create_task(run_cycle(program))
         return True
     return False
