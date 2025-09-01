@@ -290,7 +290,7 @@ async def run_cycle(program):
     start_cnt = meter.value()
     start_time = time.ticks_ms()
     try:
-        for v, ml in sorted(program.items()):
+        for v, ml in sorted(program.items(), key=lambda x: int(x[0])):
             v = int(v)
             await valve_ml(v, ml)
 
