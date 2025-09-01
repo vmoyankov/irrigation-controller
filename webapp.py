@@ -19,13 +19,12 @@ app.static("/", "/static/index.html")
 @app.route("/status")
 async def status(r, w):
     tank = config.TANK_SIZE - logic.meter.value() / config.PULSES_PER_LITER
-    tank = round(tank, 1)
     hour = logic.settings["schedule"]["hour"]
     minute = logic.settings["schedule"]["minute"]
     st = {
         "current-time": utils.fmt_time(localtime()),
         "state": logic.current_state.text(),
-        "tank": tank,
+        "tank": f"{tank:.1f} L",
         "last-run": utils.fmt_time(localtime(logic.last_run)),
         "next-run": f"{hour:02d}:{minute:02d}" if logic.settings.get("autorun", True) else "Disabled",
         "last-msg": logic.last_run_msg,
